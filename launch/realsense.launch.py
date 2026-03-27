@@ -21,7 +21,7 @@ def generate_launch_description():
 
     align_depth_arg = DeclareLaunchArgument(
         'align_depth_enable',
-        default_value='true',
+        default_value='false',
         description='Align depth frames to color camera'
     )
 
@@ -60,8 +60,8 @@ def generate_launch_description():
                     # Streams
                     'enable_depth': 'true',
                     'enable_color': 'true',
-                    'enable_infra1': 'true',
-                    'enable_infra2': 'true',
+                    'enable_infra1': 'false',
+                    'enable_infra2': 'false',
                     'enable_gyro': 'true',
                     'enable_accel': 'true',
                     # Profiles

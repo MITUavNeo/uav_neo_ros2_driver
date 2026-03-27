@@ -4,7 +4,7 @@ Reference of ROS2 topics published by the Intel RealSense D435i using `realsense
 
 > **Hardware:** Intel RealSense D435i (USB 3.2, serial 943222073786, firmware 5.17.0.9)
 
-Rates measured on UAV Neo hardware (Raspberry Pi 5, all streams enabled at 640x480 @ 30 FPS with depth filters and alignment on).
+Rates measured on UAV Neo hardware (Raspberry Pi 5, depth + color + IMU enabled at 640x480 @ 30 FPS with depth filters on, IR and alignment disabled).
 
 ---
 
@@ -27,17 +27,17 @@ Rates measured on UAV Neo hardware (Raspberry Pi 5, all streams enabled at 640x4
 
 | Topic | Message Type | Configured | Measured | Description |
 |---|---|---|---|---|
-| `/camera/depth/image_rect_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~17 Hz | Rectified depth image (16UC1, values in mm) |
-| `/camera/depth/camera_info` | `sensor_msgs/msg/CameraInfo` | 30 Hz | ~17 Hz | Depth camera intrinsics and distortion |
+| `/camera/depth/image_rect_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~30 Hz | Rectified depth image (16UC1, values in mm) |
+| `/camera/depth/camera_info` | `sensor_msgs/msg/CameraInfo` | 30 Hz | ~30 Hz | Depth camera intrinsics and distortion |
 
-> Measured rate is lower than configured due to depth filter processing (decimation, spatial, temporal) and depth-to-color alignment running on the Pi 5 CPU. Without filters, depth reaches ~19 Hz.
+> With the optimized config (IR and alignment disabled), depth reaches near-full framerate even with filters enabled.
 
 ## Color (RGB)
 
 | Topic | Message Type | Configured | Measured | Description |
 |---|---|---|---|---|
-| `/camera/color/image_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~18 Hz | Raw color image (RGB8, 640x480) |
-| `/camera/color/camera_info` | `sensor_msgs/msg/CameraInfo` | 30 Hz | ~18 Hz | Color camera intrinsics and distortion |
+| `/camera/color/image_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~26 Hz | Raw color image (RGB8, 640x480) |
+| `/camera/color/camera_info` | `sensor_msgs/msg/CameraInfo` | 30 Hz | ~26 Hz | Color camera intrinsics and distortion |
 
 ## Infrared
 
@@ -46,7 +46,7 @@ Rates measured on UAV Neo hardware (Raspberry Pi 5, all streams enabled at 640x4
 | `/camera/infra1/image_rect_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~28 Hz | Left infrared camera (Y8, 640x480) |
 | `/camera/infra2/image_rect_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~28 Hz | Right infrared camera (Y8, 640x480) |
 
-> Stereo infrared pair is useful for visual odometry (VIO) and feature tracking in low-light conditions. Infrared achieves near-full framerate because the images are small (8-bit grayscale) and require no post-processing.
+> **Disabled by default** in the UAV Neo config to reduce CPU load. Enable with: `enable_infra1:=true enable_infra2:=true` in the RealSense launch args. Stereo infrared is useful for VIO and feature tracking in low-light conditions.
 
 ## IMU
 
@@ -69,7 +69,7 @@ Rates measured on UAV Neo hardware (Raspberry Pi 5, all streams enabled at 640x4
 | `/camera/aligned_depth_to_color/image_raw` | `sensor_msgs/msg/Image` | 30 Hz | ~18 Hz | Depth image aligned to the color camera frame |
 | `/camera/aligned_depth_to_color/camera_info` | `sensor_msgs/msg/CameraInfo` | 30 Hz | ~18 Hz | Camera info matching the aligned depth |
 
-> Aligned depth maps each depth pixel to the corresponding color pixel. Essential for tasks that combine color and depth (object detection with distance, RGBD SLAM). Alignment is CPU intensive and reduces framerate.
+> **Disabled by default** in the UAV Neo config to reduce CPU load. Enable with: `ros2 launch uav_neo_ros2_driver realsense.launch.py align_depth_enable:=true`. Alignment is CPU intensive (~10% additional CPU on Pi 5). Essential for tasks that combine color and depth (object detection with distance, RGBD SLAM).
 
 ## Point Cloud
 
@@ -147,10 +147,9 @@ Disabling filters will increase the depth framerate on the Pi 5 (~19 Hz with fil
 
 ### Pi 5 Performance Considerations
 
-- With all streams enabled (depth + color + infra1 + infra2 + aligned depth + filters), expect **~17-18 Hz** for depth/color and **~28 Hz** for infrared
-- **Point cloud** is disabled by default — enable only when needed
-- Disabling **aligned depth** (`align_depth_enable:=false`) reduces CPU load
-- Disabling **depth filters** reduces CPU load slightly
+- With the default UAV Neo config (depth + color + IMU + filters, no IR or alignment), expect **~26-30 Hz** for depth/color
+- **Infrared streams**, **aligned depth**, and **point cloud** are all disabled by default to minimize CPU load
+- Enabling IR + alignment + all streams reduces rates to **~17-18 Hz** for depth/color
 - If CPU usage is too high, reduce to 424x240 or lower FPS
 - The D435i is connected over **USB 3.2** which provides full bandwidth
 

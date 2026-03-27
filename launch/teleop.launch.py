@@ -1,7 +1,7 @@
-"""Launch MAVROS and RealSense D435i together for UAV Neo teleop."""
+"""Launch MAVROS, RealSense D435i, and Arducam together for UAV Neo teleop."""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
@@ -54,6 +54,22 @@ def generate_launch_description():
         }.items(),
     )
 
+    # Arducam arguments
+    arducam_width_arg = DeclareLaunchArgument(
+        'arducam_width',
+        default_value='1280',
+        description='Arducam image width')
+
+    arducam_height_arg = DeclareLaunchArgument(
+        'arducam_height',
+        default_value='720',
+        description='Arducam image height')
+
+    arducam_framerate_arg = DeclareLaunchArgument(
+        'arducam_framerate',
+        default_value='30',
+        description='Arducam framerate')
+
     # Include RealSense launch
     realsense_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -66,6 +82,22 @@ def generate_launch_description():
         }.items(),
     )
 
+    # Include Arducam launch (delayed 5s to avoid USB contention with RealSense init)
+    arducam_launch = TimerAction(
+        period=5.0,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(launch_dir, 'arducam.launch.py')),
+                launch_arguments={
+                    'image_width': LaunchConfiguration('arducam_width'),
+                    'image_height': LaunchConfiguration('arducam_height'),
+                    'framerate': LaunchConfiguration('arducam_framerate'),
+                }.items(),
+            ),
+        ],
+    )
+
     return LaunchDescription([
         fcu_url_arg,
         gcs_url_arg,
@@ -73,6 +105,10 @@ def generate_launch_description():
         align_depth_arg,
         depth_profile_arg,
         color_profile_arg,
+        arducam_width_arg,
+        arducam_height_arg,
+        arducam_framerate_arg,
         mavros_launch,
         realsense_launch,
+        arducam_launch,
     ])

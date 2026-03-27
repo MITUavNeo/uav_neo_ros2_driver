@@ -6,7 +6,8 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 
 - [Overview](#overview)
 - [Hardware](#hardware)
-- [Prerequisites](#prerequisites)
+- [Quick Start (Automated Setup)](#quick-start-automated-setup)
+- [Manual Setup](#manual-setup)
   - [Install ROS2 Jazzy](#install-ros2-jazzy)
   - [Enable UART for Pixhawk](#enable-uart-for-pixhawk)
   - [Disable Serial Console and SysRq (Critical)](#disable-serial-console-and-sysrq-critical)
@@ -15,11 +16,15 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
   - [Pixhawk Parameter Configuration](#pixhawk-parameter-configuration)
   - [Install MAVROS](#install-mavros)
   - [Install RealSense Camera Driver](#install-realsense-camera-driver)
+  - [Install Arducam Global Shutter Camera Driver](#install-arducam-global-shutter-camera-driver)
 - [Verifying Peripherals](#verifying-peripherals)
 - [Building the Package](#building-the-package)
+- [Testing](#testing)
 - [Launching](#launching)
   - [MAVROS](#mavros)
   - [RealSense D435i](#realsense-d435i)
+  - [Arducam B0578](#arducam-b0578)
+  - [All Sensors (Teleop)](#all-sensors-teleop)
 
 ## Overview
 
@@ -30,11 +35,44 @@ UAV Neo is an educational autonomous drone platform. This ROS2 package provides 
 | Peripheral | Interface | Device Path | Description |
 |---|---|---|---|
 | Intel RealSense D435i | USB 3.0 | `/dev/video*` | RGBD + IMU camera for depth perception and SLAM |
-| Arducam B0578 2.3MP | USB 2.0 | `/dev/video*` | Global shutter camera for visual tasks |
+| Arducam B0578 2.3MP | USB 2.0 | `/dev/video*` | Downward-facing global shutter camera for optical flow |
 | Coral EdgeTPU USB Accelerator | USB 3.0 | N/A (via `libedgetpu`) | ML inference accelerator for onboard AI |
 | Pixhawk 2.8.4 (clone) | UART (TELEM2) | `/dev/ttyAMA0` | Flight controller running PX4 |
 
-## Prerequisites
+## Quick Start (Automated Setup)
+
+Setup scripts are provided in `scripts/` that automate the entire installation. Run the all-in-one script:
+
+```bash
+cd ~/ros2_ws/src/uav_neo_ros2_driver
+chmod +x scripts/setup_all.sh
+./scripts/setup_all.sh
+```
+
+This runs four phases in series:
+
+| Phase | Script | What it does |
+|---|---|---|
+| 1 | `scripts/install_ros2_jazzy.sh` | Install ROS2 Jazzy (skipped if already installed) |
+| 2 | `scripts/setup_pixhawk.sh` | Disable serial console/SysRq/Bluetooth, install MAVROS |
+| 3 | `scripts/setup_realsense.sh` | Install RealSense driver + Pi 5 IMU permission fix |
+| 4 | `scripts/setup_arducam.sh` | Install GStreamer + gscam driver |
+
+> **Reboot required:** Phase 2 modifies UART and Bluetooth kernel settings that require a reboot. The script will detect this and prompt you. After rebooting, re-run `./scripts/setup_all.sh` — already-completed phases are skipped automatically.
+
+After setup completes, the script builds the workspace. You can then verify everything works:
+
+```bash
+colcon test --packages-select uav_neo_ros2_driver --pytest-args -k hardware -v
+```
+
+The individual scripts can also be run standalone (e.g., `./scripts/setup_realsense.sh`) if you only need to set up one component.
+
+> **Note:** Pixhawk parameters (MAV_1_CONFIG, SER_TEL2_BAUD, etc.) must still be configured manually via QGroundControl. See [Pixhawk Parameter Configuration](#pixhawk-parameter-configuration) below.
+
+## Manual Setup
+
+The sections below document each setup step in detail. If you used the automated setup scripts above, these are already done — use this as a reference.
 
 ### Install ROS2 Jazzy
 
@@ -270,6 +308,39 @@ ros2 topic echo /camera/depth/image_rect_raw --once
 ros2 topic echo /camera/imu --once
 ```
 
+### Install Arducam Global Shutter Camera Driver
+
+The Arducam B0578 is a 2.3MP global shutter camera connected over USB 2.0. It outputs MJPEG which is decoded via GStreamer. The `gscam` ROS2 package bridges GStreamer pipelines to standard ROS2 image topics.
+
+1. Install GStreamer (usually pre-installed on Ubuntu 24.04) and the gscam ROS2 package:
+
+```bash
+sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-good ros-jazzy-gscam
+```
+
+2. Verify the camera is detected:
+
+```bash
+v4l2-ctl --list-devices
+# Should show: Arducam-B0578-2.3MP-GS: Arducam (usb-xhci-hcd.1-2)
+```
+
+3. Quick test (standalone):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+ros2 run gscam gscam_node --ros-args \
+  -p gscam_config:="v4l2src device=/dev/video0 ! image/jpeg,width=1280,height=720,framerate=30/1 ! jpegdec ! videoconvert" \
+  -p camera_name:=arducam \
+  -r __ns:=/arducam
+```
+
+4. In a second terminal, verify topics are publishing:
+
+```bash
+ros2 topic echo /arducam/camera/image_raw --once
+```
+
 ## Verifying Peripherals
 
 Run the following commands to confirm all peripherals are visible to the Pi:
@@ -311,6 +382,34 @@ colcon build --packages-select uav_neo_ros2_driver
 source install/setup.bash
 ```
 
+## Testing
+
+Hardware connectivity tests verify that all sensors are plugged in, detected, and accessible before launching any ROS2 nodes.
+
+### Run all hardware tests
+
+```bash
+colcon test --packages-select uav_neo_ros2_driver --pytest-args -k hardware -v
+```
+
+### What the tests check
+
+| Test Class | Tests | What it verifies |
+|---|---|---|
+| `TestPixhawk` | 6 | UART device exists, read/write permissions, dialout group, serial console disabled, SysRq disabled, Bluetooth overlay active |
+| `TestRealSense` | 5 | USB device on bus, V4L2 devices registered, rs-enumerate finds D435i, USB 3.x connection, IMU IIO permissions |
+| `TestArducam` | 4 | USB device on bus, V4L2 device listed, device node accessible, MJPEG format available |
+| `TestDependencies` | 5 | MAVROS/realsense2_camera/gscam packages installed, GeographicLib datasets, IMU fix script |
+
+Each test assertion includes a human-readable error message with the exact command to fix the issue.
+
+### Run all tests (including linters)
+
+```bash
+colcon test --packages-select uav_neo_ros2_driver
+colcon test-result --verbose
+```
+
 ## Launching
 
 ### MAVROS
@@ -331,7 +430,7 @@ For the full list of available MAVROS topics, subscribers, and services, see [do
 
 ### RealSense D435i
 
-Launch the RealSense D435i with the UAV Neo configuration (640x480 @ 30 FPS, depth + color + infrared + IMU, depth filters enabled):
+Launch the RealSense D435i with the UAV Neo configuration (640x480 @ 30 FPS, depth + color + IMU, depth filters enabled):
 
 ```bash
 ros2 launch uav_neo_ros2_driver realsense.launch.py
@@ -344,3 +443,25 @@ ros2 launch uav_neo_ros2_driver realsense.launch.py pointcloud_enable:=true
 ```
 
 For the full list of available RealSense topics, see [docs/realsense_topics.md](docs/realsense_topics.md).
+
+### Arducam B0578
+
+Launch the Arducam B0578 downward-facing global shutter camera (1280x720 @ 30 FPS MJPEG, decoded to RGB via GStreamer):
+
+```bash
+ros2 launch uav_neo_ros2_driver arducam.launch.py
+```
+
+To use full resolution (higher CPU cost):
+
+```bash
+ros2 launch uav_neo_ros2_driver arducam.launch.py image_width:=1920 image_height:=1200 framerate:=60
+```
+
+### All Sensors (Teleop)
+
+Launch MAVROS, RealSense D435i, and Arducam together:
+
+```bash
+ros2 launch uav_neo_ros2_driver teleop.launch.py
+```
