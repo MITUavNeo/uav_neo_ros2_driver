@@ -9,9 +9,17 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - [Prerequisites](#prerequisites)
   - [Install ROS2 Jazzy](#install-ros2-jazzy)
   - [Enable UART for Pixhawk](#enable-uart-for-pixhawk)
+  - [Disable Serial Console and SysRq (Critical)](#disable-serial-console-and-sysrq-critical)
+  - [Disable Bluetooth on UART](#disable-bluetooth-on-uart)
   - [Set Serial Port Permissions](#set-serial-port-permissions)
+  - [Pixhawk Parameter Configuration](#pixhawk-parameter-configuration)
+  - [Install MAVROS](#install-mavros)
+  - [Install RealSense Camera Driver](#install-realsense-camera-driver)
 - [Verifying Peripherals](#verifying-peripherals)
 - [Building the Package](#building-the-package)
+- [Launching](#launching)
+  - [MAVROS](#mavros)
+  - [RealSense D435i](#realsense-d435i)
 
 ## Overview
 
@@ -24,7 +32,7 @@ UAV Neo is an educational autonomous drone platform. This ROS2 package provides 
 | Intel RealSense D435i | USB 3.0 | `/dev/video*` | RGBD + IMU camera for depth perception and SLAM |
 | Arducam B0578 2.3MP | USB 2.0 | `/dev/video*` | Global shutter camera for visual tasks |
 | Coral EdgeTPU USB Accelerator | USB 3.0 | N/A (via `libedgetpu`) | ML inference accelerator for onboard AI |
-| Pixhawk 2.8.4 (clone) | UART (TELEM2) | `/dev/ttyAMA0` | Flight controller running ArduPilot/PX4 |
+| Pixhawk 2.8.4 (clone) | UART (TELEM2) | `/dev/ttyAMA0` | Flight controller running PX4 |
 
 ## Prerequisites
 
@@ -64,7 +72,77 @@ sudo raspi-config
 sudo reboot
 ```
 
-After reboot, `/dev/ttyAMA0` should be available. The default TELEM2 baud rate is **921600**.
+After reboot, `/dev/ttyAMA0` should be available.
+
+### Disable Serial Console and SysRq (Critical)
+
+> **WARNING:** Do **not** connect the Pixhawk UART before completing **all** steps in this section and the next (Disable Bluetooth on UART). Ubuntu defaults to using the UART as a kernel boot console, login shell, and SysRq input. MAVLink data from the Pixhawk will be interpreted as system commands, causing two failure modes:
+>
+> 1. **Boot loop** — MAVLink data is interpreted as console/login input, preventing the Pi from booting. Can only be resolved by physically disconnecting the Pixhawk.
+> 2. **System crash** — MAVLink byte sequences are interpreted as kernel SysRq commands (e.g., emergency remount read-only, sync, reboot), causing the filesystem to go read-only and the system to lock up.
+
+1. Remove the serial console from the kernel command line:
+
+```bash
+sudo sed -i 's/ console=serial0,115200//' /boot/firmware/cmdline.txt
+```
+
+2. Disable the login shell on the serial port:
+
+```bash
+sudo systemctl stop serial-getty@ttyAMA0.service
+sudo systemctl disable serial-getty@ttyAMA0.service
+```
+
+3. Disable the kernel SysRq handler so serial data cannot trigger kernel commands:
+
+```bash
+echo "kernel.sysrq = 0" | sudo tee /etc/sysctl.d/99-disable-sysrq.conf
+sudo sysctl -p /etc/sysctl.d/99-disable-sysrq.conf
+```
+
+4. Reboot:
+
+```bash
+sudo reboot
+```
+
+5. Verify the changes after reboot:
+
+```bash
+# Should NOT contain "console=serial0"
+cat /boot/firmware/cmdline.txt
+
+# Should show "disabled"
+sudo systemctl is-enabled serial-getty@ttyAMA0.service
+
+# Should show "0"
+cat /proc/sys/kernel/sysrq
+```
+
+### Disable Bluetooth on UART
+
+By default, the Pi's Bluetooth controller uses the PL011 UART (`/dev/ttyAMA0`) — the same port needed for the Pixhawk. Bluetooth must be moved off this UART to avoid conflicts.
+
+1. Add the `disable-bt` overlay to `/boot/firmware/config.txt`:
+
+```bash
+echo -e "\n# Free PL011 UART for Pixhawk MAVLink\ndtoverlay=disable-bt" | sudo tee -a /boot/firmware/config.txt
+```
+
+2. Disable the Bluetooth service:
+
+```bash
+sudo systemctl disable bluetooth.service
+```
+
+3. Reboot:
+
+```bash
+sudo reboot
+```
+
+It is now safe to connect the Pixhawk UART to the Pi.
 
 ### Set Serial Port Permissions
 
@@ -75,6 +153,95 @@ sudo usermod -aG dialout $USER
 ```
 
 Log out and back in (or reboot) for the group change to take effect.
+
+### Pixhawk Parameter Configuration
+
+The Pixhawk must be configured to output MAVLink on TELEM2. Connect to the Pixhawk using **QGroundControl** and set the following parameters:
+
+| Parameter | Value | Description |
+|---|---|---|
+| `MAV_1_CONFIG` | `TELEM2` | Enable MAVLink on TELEM2 |
+| `SER_TEL2_BAUD` | `921600` | UART baud rate |
+| `MAV_1_RATE` | `0` (auto) or desired rate | MAVLink message rate (0 = auto) |
+| `MAV_1_MODE` | `Onboard` | Companion computer mode (lower latency, includes position/attitude streams) |
+
+After setting parameters, reboot the Pixhawk for changes to take effect.
+
+**Wiring (TELEM2 to Raspberry Pi GPIO):**
+
+| TELEM2 Pin | Pi GPIO | Description |
+|---|---|---|
+| TX | GPIO 15 (RXD) | Pixhawk transmit to Pi receive |
+| RX | GPIO 14 (TXD) | Pi transmit to Pixhawk receive |
+| GND | GND | Common ground |
+
+> **Note:** TX and RX must be **crossed** (TX to RX, RX to TX). Do not connect the TELEM2 5V pin to the Pi.
+
+### Install MAVROS
+
+MAVROS provides a standard ROS2 interface to the Pixhawk over MAVLink, publishing sensor data as ROS2 topics and exposing services for arming, mode switching, and sending commands.
+
+1. Install MAVROS and its dependencies:
+
+```bash
+sudo apt install -y ros-jazzy-mavros ros-jazzy-mavros-extras ros-jazzy-mavros-msgs
+```
+
+2. Install the GeographicLib datasets (required for coordinate transforms):
+
+```bash
+sudo /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh
+```
+
+3. Verify MAVROS can connect to the Pixhawk:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+ros2 launch mavros px4.launch fcu_url:=/dev/ttyAMA0:921600
+```
+
+You should see `CON: Got HEARTBEAT, connected. FCU: PX4 Autopilot` in the output.
+
+4. In a second terminal, verify topics are publishing:
+
+```bash
+ros2 topic echo /mavros/state --once
+ros2 topic echo /mavros/imu/data --once
+ros2 topic echo /mavros/rc/in --once
+```
+
+### Install RealSense Camera Driver
+
+The Intel RealSense D435i provides depth, color, infrared, and IMU data over USB 3.0. The `realsense2_camera` ROS2 package publishes all streams as standard ROS2 topics.
+
+1. Install the RealSense ROS2 packages:
+
+```bash
+sudo apt install -y ros-jazzy-realsense2-camera ros-jazzy-realsense2-camera-msgs ros-jazzy-realsense2-description
+```
+
+2. Verify the camera is detected:
+
+```bash
+rs-enumerate-devices --compact
+```
+
+You should see `Intel RealSense D435I` with a serial number and firmware version.
+
+3. Quick test (standalone, without the custom launch file):
+
+```bash
+source /opt/ros/jazzy/setup.bash
+ros2 launch realsense2_camera rs_launch.py enable_gyro:=true enable_accel:=true
+```
+
+4. In a second terminal, verify topics are publishing:
+
+```bash
+ros2 topic echo /camera/color/image_raw --once
+ros2 topic echo /camera/depth/image_rect_raw --once
+ros2 topic echo /camera/imu --once
+```
 
 ## Verifying Peripherals
 
@@ -116,3 +283,37 @@ cd ~/ros2_ws
 colcon build --packages-select uav_neo_ros2_driver
 source install/setup.bash
 ```
+
+## Launching
+
+### MAVROS
+
+A custom launch file is provided that starts MAVROS with the correct UART settings for the Pixhawk:
+
+```bash
+ros2 launch uav_neo_ros2_driver mavros.launch.py
+```
+
+To also bridge to QGroundControl over UDP:
+
+```bash
+ros2 launch uav_neo_ros2_driver mavros.launch.py gcs_url:=udp://:14550@
+```
+
+For the full list of available MAVROS topics, subscribers, and services, see [docs/mavros_topics.md](docs/mavros_topics.md).
+
+### RealSense D435i
+
+Launch the RealSense D435i with the UAV Neo configuration (640x480 @ 30 FPS, depth + color + infrared + IMU, depth filters enabled):
+
+```bash
+ros2 launch uav_neo_ros2_driver realsense.launch.py
+```
+
+To enable point cloud generation (CPU intensive):
+
+```bash
+ros2 launch uav_neo_ros2_driver realsense.launch.py pointcloud_enable:=true
+```
+
+For the full list of available RealSense topics, see [docs/realsense_topics.md](docs/realsense_topics.md).
