@@ -228,14 +228,41 @@ rs-enumerate-devices --compact
 
 You should see `Intel RealSense D435I` with a serial number and firmware version.
 
-3. Quick test (standalone, without the custom launch file):
+3. Fix IMU permissions (required on Raspberry Pi 5):
+
+The D435i IMU uses HID-sensor IIO devices that default to root-only on the Pi 5. Install the permission fix script and udev rule:
+
+```bash
+# Create the fix script
+sudo tee /usr/local/bin/fix-realsense-imu.sh > /dev/null << 'EOF'
+#!/bin/bash
+for dev in /sys/bus/iio/devices/iio:device*; do
+    [ -d "$dev" ] || continue
+    chmod 666 "$dev"/scan_elements/in_*_en 2>/dev/null
+    chmod 666 "$dev"/buffer/enable 2>/dev/null
+    chmod 666 "$dev"/buffer/length 2>/dev/null
+    chmod 666 "$dev"/trigger/current_trigger 2>/dev/null
+    chmod 666 "$dev"/in_*_sampling_frequency 2>/dev/null
+    chmod 666 "$dev"/in_*_hysteresis 2>/dev/null
+    [ -e /dev/"$(basename "$dev")" ] && chmod 666 /dev/"$(basename "$dev")"
+done
+EOF
+sudo chmod +x /usr/local/bin/fix-realsense-imu.sh
+
+# Create udev rule to fix permissions on device plug
+echo 'SUBSYSTEM=="iio", KERNEL=="iio:device*", ACTION=="add", RUN+="/usr/local/bin/fix-realsense-imu.sh"' | sudo tee /etc/udev/rules.d/99-realsense-imu.rules
+sudo udevadm control --reload-rules
+```
+
+4. Quick test (standalone, without the custom launch file):
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-ros2 launch realsense2_camera rs_launch.py enable_gyro:=true enable_accel:=true
+sudo /usr/local/bin/fix-realsense-imu.sh
+ros2 launch realsense2_camera rs_launch.py camera_namespace:=/ camera_name:=camera enable_gyro:=true enable_accel:=true
 ```
 
-4. In a second terminal, verify topics are publishing:
+5. In a second terminal, verify topics are publishing:
 
 ```bash
 ros2 topic echo /camera/color/image_raw --once
