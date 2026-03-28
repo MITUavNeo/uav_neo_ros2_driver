@@ -31,13 +31,16 @@ def generate_launch_description():
         default_value='30',
         description='Camera framerate as integer (max depends on resolution)')
 
-    # Build GStreamer pipeline string from launch arguments
+    # Build GStreamer pipeline string from launch arguments.
+    # Queue with leaky=downstream drops old frames under CPU load, preventing
+    # the gscam appsink memory leak (github.com/ros-drivers/gscam/issues/63).
     gscam_config = PythonExpression([
         "'v4l2src device=", LaunchConfiguration('video_device'),
         " ! image/jpeg,width=", LaunchConfiguration('image_width'),
         ",height=", LaunchConfiguration('image_height'),
         ",framerate=", LaunchConfiguration('framerate'),
-        "/1 ! jpegdec ! videoconvert'"
+        "/1 ! jpegdec ! videoconvert"
+        " ! queue max-size-buffers=2 leaky=downstream'"
     ])
 
     arducam_node = Node(

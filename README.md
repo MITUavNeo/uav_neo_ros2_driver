@@ -25,6 +25,13 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
   - [RealSense D435i](#realsense-d435i)
   - [Arducam B0578](#arducam-b0578)
   - [All Sensors (Teleop)](#all-sensors-teleop)
+- [Services](#services)
+  - [Teleop Autostart](#teleop-autostart)
+  - [Node Watchdog](#node-watchdog)
+  - [Web Dashboard](#web-dashboard)
+  - [JupyterLab](#jupyterlab)
+  - [Managing Services](#managing-services)
+- [Logging](#logging)
 
 ## Overview
 
@@ -49,7 +56,7 @@ chmod +x scripts/setup_all.sh
 ./scripts/setup_all.sh
 ```
 
-This runs four phases in series:
+This runs five phases in series:
 
 | Phase | Script | What it does |
 |---|---|---|
@@ -57,6 +64,7 @@ This runs four phases in series:
 | 2 | `scripts/setup_pixhawk.sh` | Disable serial console/SysRq/Bluetooth, install MAVROS |
 | 3 | `scripts/setup_realsense.sh` | Install RealSense driver + Pi 5 IMU permission fix |
 | 4 | `scripts/setup_arducam.sh` | Install GStreamer + gscam driver |
+| 5 | `scripts/setup_services.sh` | Install systemd services, JupyterLab, create log dirs |
 
 > **Reboot required:** Phase 2 modifies UART and Bluetooth kernel settings that require a reboot. The script will detect this and prompt you. After rebooting, re-run `./scripts/setup_all.sh` — already-completed phases are skipped automatically.
 
@@ -465,3 +473,111 @@ Launch MAVROS, RealSense D435i, and Arducam together:
 ```bash
 ros2 launch uav_neo_ros2_driver teleop.launch.py
 ```
+
+## Services
+
+Four systemd services are installed by `scripts/setup_services.sh` (or Phase 5 of `setup_all.sh`). All services start automatically on boot.
+
+### Teleop Autostart
+
+The `uav-teleop` service launches the full sensor stack (MAVROS + RealSense + Arducam) on boot using `scripts/launch_teleop.sh`. This wrapper creates a timestamped log directory under `~/logs/` before launching.
+
+```bash
+sudo systemctl start uav-teleop    # start now
+sudo systemctl stop uav-teleop     # stop
+sudo systemctl restart uav-teleop  # restart (creates new log session)
+```
+
+### Node Watchdog
+
+The `uav-watchdog` service monitors the three sensor nodes every 5 seconds. When a node disappears:
+
+1. Checks if the underlying hardware is still connected (UART for Pixhawk, USB for cameras)
+2. If connected: restarts the individual node's launch file and logs rosout to `~/logs/latest/restart_<node>_<time>.log`
+3. If disconnected: logs a warning and waits for the device to reappear
+4. Enforces a 30-second cooldown between restarts of the same node
+
+The watchdog starts 15 seconds after teleop to allow all nodes to initialize.
+
+### Web Dashboard
+
+The `uav-dashboard` service runs a web-based monitoring page on **port 8080**. Open in a browser:
+
+```
+http://<pi-ip>:8080
+```
+
+The dashboard shows:
+- Green/red indicators for each node (MAVROS, RealSense, Arducam)
+- Topic publish rates with stale/dead detection
+- Recent watchdog restart events
+
+The page auto-refreshes every 3 seconds. No additional dependencies are required — it uses Python's built-in HTTP server.
+
+### JupyterLab
+
+The `uav-jupyter` service runs JupyterLab on **port 8888** for interactive development:
+
+```
+http://<pi-ip>:8888
+```
+
+JupyterLab opens in the `~/jupyter_ws/` directory by default. ROS2 Python packages (`rclpy`, etc.) are available in notebooks.
+
+**Dependencies:** JupyterLab is installed in a virtual environment at `~/jupyter_venv/` by `setup_services.sh`. No authentication is required (educational use on a private network).
+
+To install JupyterLab manually (if not using the setup script):
+
+```bash
+python3 -m venv ~/jupyter_venv
+~/jupyter_venv/bin/pip install jupyterlab
+mkdir -p ~/jupyter_ws
+```
+
+### Managing Services
+
+**Check status of all services:**
+
+```bash
+systemctl status uav-teleop uav-watchdog uav-dashboard uav-jupyter
+```
+
+**Disable a service from starting on boot:**
+
+```bash
+sudo systemctl disable uav-teleop   # (or any service name)
+```
+
+**Re-enable:**
+
+```bash
+sudo systemctl enable uav-teleop
+```
+
+**View live logs via journald:**
+
+```bash
+journalctl -u uav-teleop -f         # teleop output
+journalctl -u uav-watchdog -f       # watchdog events
+journalctl -u uav-dashboard -f      # dashboard server
+journalctl -u uav-jupyter -f        # JupyterLab server
+```
+
+## Logging
+
+Each time the teleop service starts (on boot or manual restart), a new timestamped directory is created:
+
+```
+~/logs/
+├── latest -> 20260327_143000/    (symlink to current session)
+├── 20260327_143000/
+│   ├── teleop.log                (combined teleop stdout/stderr)
+│   ├── watchdog.log              (watchdog events)
+│   ├── dashboard.log             (dashboard server log)
+│   ├── jupyter.log               (JupyterLab server log)
+│   ├── restart_mavros_143512.log (rosout from restarted node)
+│   └── ...                       (ROS2 internal logs via ROS_LOG_DIR)
+└── 20260326_.../                 (previous sessions)
+```
+
+The `~/logs/latest` symlink always points to the most recent session. Logs are not automatically cleaned up — manage disk space manually by deleting old session directories.

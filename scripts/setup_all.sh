@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_all.sh — Complete UAV Neo setup: ROS2 + Pixhawk + RealSense + Arducam
+# setup_all.sh — Complete UAV Neo setup: ROS2 + Pixhawk + RealSense + Arducam + Services
 #
 # This script runs each component setup in series. The Pixhawk/UART setup
 # requires a reboot before the flight controller can be connected, so this
@@ -26,7 +26,7 @@ echo ""
 # -----------------------------------------------
 # Phase 1: ROS2 Jazzy
 # -----------------------------------------------
-echo ">>> Phase 1/4: ROS2 Jazzy"
+echo ">>> Phase 1/5: ROS2 Jazzy"
 echo "-------------------------------------------"
 if command -v ros2 &>/dev/null; then
     echo "ROS2 already installed ($(ros2 --version 2>/dev/null || echo 'unknown version')). Skipping."
@@ -39,7 +39,7 @@ echo ""
 # -----------------------------------------------
 # Phase 2: Pixhawk UART + MAVROS
 # -----------------------------------------------
-echo ">>> Phase 2/4: Pixhawk UART + MAVROS"
+echo ">>> Phase 2/5: Pixhawk UART + MAVROS"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_pixhawk.sh"
 echo ""
@@ -65,8 +65,7 @@ if [ "$NEEDS_REBOOT" = true ]; then
     echo "  to take effect before continuing."
     echo ""
     echo "  After reboot, re-run this script to"
-    echo "  continue with Phase 3 (RealSense) and"
-    echo "  Phase 4 (Arducam). Already-completed"
+    echo "  continue with Phases 3-5. Already-completed"
     echo "  phases will be skipped automatically."
     echo "============================================"
     echo ""
@@ -82,7 +81,7 @@ fi
 # -----------------------------------------------
 # Phase 3: RealSense D435i
 # -----------------------------------------------
-echo ">>> Phase 3/4: RealSense D435i"
+echo ">>> Phase 3/5: RealSense D435i"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_realsense.sh"
 echo ""
@@ -90,7 +89,7 @@ echo ""
 # -----------------------------------------------
 # Phase 4: Arducam B0578
 # -----------------------------------------------
-echo ">>> Phase 4/4: Arducam B0578"
+echo ">>> Phase 4/5: Arducam B0578"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_arducam.sh"
 echo ""
@@ -106,11 +105,22 @@ colcon build --packages-select uav_neo_ros2_driver
 source install/setup.bash
 echo ""
 
+# -----------------------------------------------
+# Phase 5: Services
+# -----------------------------------------------
+echo ">>> Phase 5/5: Services (teleop, watchdog, dashboard, JupyterLab)"
+echo "-------------------------------------------"
+bash "$SCRIPT_DIR/setup_services.sh"
+echo ""
+
 echo "============================================"
 echo "  UAV Neo setup complete!"
 echo ""
 echo "  Launch all sensors:"
 echo "    ros2 launch uav_neo_ros2_driver teleop.launch.py"
+echo ""
+echo "  Or reboot to start services automatically:"
+echo "    sudo reboot"
 echo ""
 echo "  Don't forget to configure Pixhawk params"
 echo "  via QGroundControl (see setup_pixhawk.sh"

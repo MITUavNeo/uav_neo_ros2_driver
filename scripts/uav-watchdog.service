@@ -1,0 +1,21 @@
+[Unit]
+Description=UAV Neo Node Watchdog
+After=uav-teleop.service
+BindsTo=uav-teleop.service
+
+[Service]
+Type=exec
+User=uav
+Group=uav
+ExecStartPre=/bin/sleep 15
+ExecStart=/bin/bash -c '\
+    source /opt/ros/jazzy/setup.bash && \
+    source /home/uav/ros2_ws/install/setup.bash && \
+    exec python3 /home/uav/ros2_ws/src/uav_neo_ros2_driver/scripts/watchdog.py'
+Restart=on-failure
+RestartSec=5
+Environment=HOME=/home/uav
+WorkingDirectory=/home/uav/ros2_ws
+
+[Install]
+WantedBy=multi-user.target

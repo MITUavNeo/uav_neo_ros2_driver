@@ -1,0 +1,5 @@
+# Disable USB autosuspend for UAV cameras to prevent disconnects during streaming
+# RealSense D435i
+SUBSYSTEM=="usb", ATTR{idVendor}=="8086", ATTR{idProduct}=="0b3a", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"
+# Arducam B0578
+SUBSYSTEM=="usb", ATTR{idVendor}=="0c45", ATTR{idProduct}=="0578", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"
