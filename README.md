@@ -64,6 +64,7 @@ This runs five phases in series:
 | 2 | `scripts/setup_pixhawk.sh` | Disable serial console/SysRq/Bluetooth, install MAVROS |
 | 3 | `scripts/setup_realsense.sh` | Install RealSense driver + Pi 5 IMU permission fix |
 | 4 | `scripts/setup_arducam.sh` | Install GStreamer + gscam driver |
+| 4b | `scripts/patch_gscam.sh` | Patch gscam appsink memory leak (clone, fix, build) |
 | 5 | `scripts/setup_services.sh` | Install systemd services, JupyterLab, create log dirs |
 
 > **Reboot required:** Phase 2 modifies UART and Bluetooth kernel settings that require a reboot. The script will detect this and prompt you. After rebooting, re-run `./scripts/setup_all.sh` — already-completed phases are skipped automatically.
@@ -326,24 +327,34 @@ The Arducam B0578 is a 2.3MP global shutter camera connected over USB 2.0. It ou
 sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-good ros-jazzy-gscam
 ```
 
-2. Verify the camera is detected:
+2. **Patch gscam** to fix the appsink memory leak ([ros-drivers/gscam#63](https://github.com/ros-drivers/gscam/issues/63)):
+
+```bash
+./scripts/patch_gscam.sh
+```
+
+This clones the gscam source, applies a two-line fix that limits the appsink internal buffer (`max-buffers=1, drop=true`), and builds it as a colcon overlay. Without this patch, gscam leaks memory under CPU load and will be OOM-killed within minutes. See [docs/topic_bandwidth.md](docs/topic_bandwidth.md) for bandwidth and resource details.
+
+> **Note:** The apt-installed `ros-jazzy-gscam` package remains installed but is shadowed by the overlay build. If you ever reinstall gscam from apt, re-run `patch_gscam.sh`.
+
+3. Verify the camera is detected:
 
 ```bash
 v4l2-ctl --list-devices
 # Should show: Arducam-B0578-2.3MP-GS: Arducam (usb-xhci-hcd.1-2)
 ```
 
-3. Quick test (standalone):
+4. Quick test (standalone):
 
 ```bash
-source /opt/ros/jazzy/setup.bash
+source ~/ros2_ws/install/setup.bash
 ros2 run gscam gscam_node --ros-args \
-  -p gscam_config:="v4l2src device=/dev/video0 ! image/jpeg,width=1280,height=720,framerate=30/1 ! jpegdec ! videoconvert" \
+  -p gscam_config:="v4l2src device=/dev/video0 ! image/jpeg,width=640,height=480,framerate=30/1 ! jpegdec ! videoconvert ! queue max-size-buffers=2 leaky=downstream" \
   -p camera_name:=arducam \
   -r __ns:=/arducam
 ```
 
-4. In a second terminal, verify topics are publishing:
+5. In a second terminal, verify topics are publishing:
 
 ```bash
 ros2 topic echo /arducam/camera/image_raw --once
@@ -438,7 +449,7 @@ For the full list of available MAVROS topics, subscribers, and services, see [do
 
 ### RealSense D435i
 
-Launch the RealSense D435i with the UAV Neo configuration (640x480 @ 30 FPS, depth + color + IMU, depth filters enabled):
+Launch the RealSense D435i with the UAV Neo configuration (640x480 @ 15 FPS, depth + color + IMU, depth filters enabled):
 
 ```bash
 ros2 launch uav_neo_ros2_driver realsense.launch.py
@@ -454,17 +465,19 @@ For the full list of available RealSense topics, see [docs/realsense_topics.md](
 
 ### Arducam B0578
 
-Launch the Arducam B0578 downward-facing global shutter camera (1280x720 @ 30 FPS MJPEG, decoded to RGB via GStreamer):
+Launch the Arducam B0578 downward-facing global shutter camera (640x480 @ 30 FPS MJPEG, capped to 20 FPS output via GStreamer `videorate`):
 
 ```bash
 ros2 launch uav_neo_ros2_driver arducam.launch.py
 ```
 
-To use full resolution (higher CPU cost):
+To use higher resolution (lower effective publish rate due to Pi 5 CPU limits):
 
 ```bash
-ros2 launch uav_neo_ros2_driver arducam.launch.py image_width:=1920 image_height:=1200 framerate:=60
+ros2 launch uav_neo_ros2_driver arducam.launch.py image_width:=1280 image_height:=720
 ```
+
+> **Note:** Requires the patched gscam build (`scripts/patch_gscam.sh`). The stock apt package will leak memory.
 
 ### All Sensors (Teleop)
 

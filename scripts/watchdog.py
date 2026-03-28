@@ -216,6 +216,19 @@ def main() -> None:
     log.info('Watchdog started — monitoring: %s', ', '.join(NODES.keys()))
     log.info('Log directory: %s', logdir)
 
+    # Deprioritise MAVROS (CPU-bound serial I/O, tolerates nice 5) so the
+    # camera pipelines get more scheduling time.  This boosts camera publish
+    # rates from ~13-16 Hz to ~25-32 Hz with negligible MAVROS impact.
+    try:
+        r = subprocess.run(['pgrep', '-f', 'mavros_node'],
+                           capture_output=True, text=True, timeout=5)
+        for pid in r.stdout.strip().splitlines():
+            subprocess.run(['renice', '5', '-p', pid],
+                           capture_output=True, timeout=5)
+            log.info('Set mavros_node PID %s to nice 5', pid)
+    except (subprocess.TimeoutExpired, OSError):
+        log.warning('Failed to renice mavros_node')
+
     while _running:
         topics = _get_active_topics()
 

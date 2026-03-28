@@ -119,7 +119,7 @@ camera_link
 
 ### Resolution and Framerate
 
-The default UAV Neo config runs at 640x480 @ 30 FPS for all streams. Available profiles for D435i:
+The default UAV Neo config runs at 640x480 @ 15 FPS for depth and color streams. Available profiles for D435i:
 
 | Resolution | Max FPS (Depth) | Max FPS (Color) | Notes |
 |---|---|---|---|
@@ -147,11 +147,12 @@ Disabling filters will increase the depth framerate on the Pi 5 (~19 Hz with fil
 
 ### Pi 5 Performance Considerations
 
-- With the default UAV Neo config (depth + color + IMU + filters, no IR or alignment), expect **~26-30 Hz** for depth/color
+- With the default UAV Neo config (depth + color + IMU + filters at 15 FPS, no IR or alignment), expect **~10-15 Hz** for depth/color publish rate under full teleop load (MAVROS + Arducam running)
 - **Infrared streams**, **aligned depth**, and **point cloud** are all disabled by default to minimize CPU load
-- Enabling IR + alignment + all streams reduces rates to **~17-18 Hz** for depth/color
+- Enabling IR + alignment + all streams significantly increases CPU usage
 - If CPU usage is too high, reduce to 424x240 or lower FPS
 - The D435i is connected over **USB 3.2** which provides full bandwidth
+- RealSense CPU usage: ~29-55% of one core depending on system load
 
 ---
 

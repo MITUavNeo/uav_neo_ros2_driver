@@ -95,6 +95,14 @@ bash "$SCRIPT_DIR/setup_arducam.sh"
 echo ""
 
 # -----------------------------------------------
+# Phase 4b: Patch gscam (appsink memory-leak fix)
+# -----------------------------------------------
+echo ">>> Phase 4b: Patch gscam (memory-leak fix)"
+echo "-------------------------------------------"
+bash "$SCRIPT_DIR/patch_gscam.sh"
+echo ""
+
+# -----------------------------------------------
 # Build the workspace
 # -----------------------------------------------
 echo ">>> Building ROS2 workspace..."

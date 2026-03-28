@@ -31,17 +31,17 @@ def generate_launch_description():
 
     align_depth_arg = DeclareLaunchArgument(
         'align_depth_enable',
-        default_value='true',
+        default_value='false',
         description='Align depth frames to color camera')
 
     depth_profile_arg = DeclareLaunchArgument(
         'depth_profile',
-        default_value='640x480x30',
+        default_value='640x480x15',
         description='Depth and infrared stream profile (widthxheightxfps)')
 
     color_profile_arg = DeclareLaunchArgument(
         'color_profile',
-        default_value='640x480x30',
+        default_value='640x480x15',
         description='Color stream profile (widthxheightxfps)')
 
     # Include MAVROS launch

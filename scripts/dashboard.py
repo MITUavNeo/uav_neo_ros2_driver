@@ -94,8 +94,8 @@ def _measure_hz(topic: str) -> float | None:
     """Measure topic rate over a short window. Returns Hz or None."""
     try:
         r = subprocess.run(
-            ['ros2', 'topic', 'hz', topic, '--window', '5'],
-            capture_output=True, text=True, timeout=8,
+            ['ros2', 'topic', 'hz', topic, '--window', '3'],
+            capture_output=True, text=True, timeout=15,
         )
         # ros2 topic hz may print to stdout or stderr depending on version
         output = r.stdout + '\n' + r.stderr
