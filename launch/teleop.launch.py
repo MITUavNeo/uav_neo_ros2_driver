@@ -57,12 +57,12 @@ def generate_launch_description():
     # Arducam arguments
     arducam_width_arg = DeclareLaunchArgument(
         'arducam_width',
-        default_value='1280',
+        default_value='640',
         description='Arducam image width')
 
     arducam_height_arg = DeclareLaunchArgument(
         'arducam_height',
-        default_value='720',
+        default_value='480',
         description='Arducam image height')
 
     arducam_framerate_arg = DeclareLaunchArgument(

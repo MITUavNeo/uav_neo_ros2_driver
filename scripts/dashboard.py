@@ -94,13 +94,26 @@ def _measure_hz(topic: str) -> float | None:
     """Measure topic rate over a short window. Returns Hz or None."""
     try:
         r = subprocess.run(
-            ['ros2', 'topic', 'hz', topic, '--window', '3'],
-            capture_output=True, text=True, timeout=5,
+            ['ros2', 'topic', 'hz', topic, '--window', '5'],
+            capture_output=True, text=True, timeout=8,
         )
-        for line in r.stdout.splitlines():
+        # ros2 topic hz may print to stdout or stderr depending on version
+        output = r.stdout + '\n' + r.stderr
+        for line in output.splitlines():
             if 'average rate' in line:
                 return float(line.split(':')[1].strip())
-    except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
+    except subprocess.TimeoutExpired as e:
+        # On timeout, partial output may still contain a rate measurement
+        raw = e.stdout or b''
+        if isinstance(raw, bytes):
+            raw = raw.decode(errors='replace')
+        for line in raw.splitlines():
+            if 'average rate' in line:
+                try:
+                    return float(line.split(':')[1].strip())
+                except (ValueError, IndexError):
+                    pass
+    except (ValueError, IndexError, OSError):
         pass
     return None
 
@@ -149,7 +162,7 @@ def _monitor_loop() -> None:
                 t.start()
                 threads.append(t)
             for t in threads:
-                t.join(timeout=6)
+                t.join(timeout=10)
 
             rates = {}
             for topic in RATE_TOPICS:

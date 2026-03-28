@@ -36,12 +36,14 @@ NODES = {
         'launch': 'mavros.launch.py',
         'device_check': lambda: os.path.exists('/dev/ttyAMA0'),
         'device_label': '/dev/ttyAMA0 (UART)',
+        'kill_pattern': 'mavros_node',  # process name to pkill before restart
     },
     'realsense': {
         'topic': '/camera/color/image_raw',
         'launch': 'realsense.launch.py',
         'device_check': lambda: _usb_device_present('8086:0b3a'),
         'device_label': 'USB 8086:0b3a (RealSense D435i)',
+        'kill_pattern': 'realsense2_camera_node',
     },
     'arducam': {
         'topic': '/arducam/camera/image_raw',
@@ -49,6 +51,7 @@ NODES = {
         'device_check': lambda: _usb_device_present('0c45:0578'),
         'device_label': 'USB 0c45:0578 (Arducam B0578)',
         'restart_delay': 5,  # seconds — USB bus contention with RealSense
+        'kill_pattern': 'gscam_node',
     },
 }
 
@@ -120,6 +123,24 @@ def _restart_node(name: str, cfg: dict) -> None:
             old_proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             old_proc.kill()
+
+    # Kill any stale system-wide processes (e.g. from teleop.launch) that
+    # might still hold the device open, preventing a clean restart.
+    # SIGTERM first, then SIGKILL if any survive after 2 seconds.
+    kill_pat = cfg.get('kill_pattern')
+    if kill_pat:
+        try:
+            r = subprocess.run(['pkill', '-f', kill_pat], capture_output=True, timeout=5)
+            if r.returncode == 0:
+                log.info('%s: sent SIGTERM to processes matching "%s"', name, kill_pat)
+                time.sleep(2)
+                # Force-kill any survivors
+                r2 = subprocess.run(['pkill', '-9', '-f', kill_pat], capture_output=True, timeout=5)
+                if r2.returncode == 0:
+                    log.info('%s: sent SIGKILL to surviving processes', name)
+                time.sleep(1)
+        except subprocess.TimeoutExpired:
+            pass
 
     delay = cfg.get('restart_delay', 0)
     if delay > 0:
