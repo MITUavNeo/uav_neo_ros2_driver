@@ -103,6 +103,14 @@ bash "$SCRIPT_DIR/patch_gscam.sh"
 echo ""
 
 # -----------------------------------------------
+# Phase 4c: Coral EdgeTPU
+# -----------------------------------------------
+echo ">>> Phase 4c: Coral EdgeTPU"
+echo "-------------------------------------------"
+bash "$SCRIPT_DIR/setup_coral.sh"
+echo ""
+
+# -----------------------------------------------
 # Build the workspace
 # -----------------------------------------------
 echo ">>> Building ROS2 workspace..."

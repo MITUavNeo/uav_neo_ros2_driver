@@ -2,6 +2,7 @@
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.conditions import LaunchConfigurationEquals, LaunchConfigurationNotEquals
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from ament_index_python.packages import get_package_share_directory
@@ -82,6 +83,32 @@ def generate_launch_description():
         }.items(),
     )
 
+    # EdgeTPU arguments
+    edgetpu_enable_arg = DeclareLaunchArgument(
+        'edgetpu_enable',
+        default_value='false',
+        description='Enable EdgeTPU inference node (true/false)')
+
+    edgetpu_config_arg = DeclareLaunchArgument(
+        'edgetpu_config',
+        default_value=os.path.join(pkg_dir, 'config', 'edgetpu.yaml'),
+        description='Path to EdgeTPU config YAML')
+
+    # Include EdgeTPU launch (delayed 3s to allow RealSense to start publishing)
+    edgetpu_launch = TimerAction(
+        period=3.0,
+        actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(launch_dir, 'edgetpu.launch.py')),
+                launch_arguments={
+                    'edgetpu_config': LaunchConfiguration('edgetpu_config'),
+                }.items(),
+            ),
+        ],
+        condition=LaunchConfigurationEquals('edgetpu_enable', 'true'),
+    )
+
     # Include Arducam launch (delayed 5s to avoid USB contention with RealSense init)
     arducam_launch = TimerAction(
         period=5.0,
@@ -108,7 +135,10 @@ def generate_launch_description():
         arducam_width_arg,
         arducam_height_arg,
         arducam_framerate_arg,
+        edgetpu_enable_arg,
+        edgetpu_config_arg,
         mavros_launch,
         realsense_launch,
         arducam_launch,
+        edgetpu_launch,
     ])

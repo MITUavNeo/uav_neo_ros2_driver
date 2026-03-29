@@ -56,7 +56,7 @@ chmod +x scripts/setup_all.sh
 ./scripts/setup_all.sh
 ```
 
-This runs five phases in series:
+This runs five phases in series (Phase 4 has sub-phases):
 
 | Phase | Script | What it does |
 |---|---|---|
@@ -65,6 +65,7 @@ This runs five phases in series:
 | 3 | `scripts/setup_realsense.sh` | Install RealSense driver + Pi 5 IMU permission fix |
 | 4 | `scripts/setup_arducam.sh` | Install GStreamer + gscam driver |
 | 4b | `scripts/patch_gscam.sh` | Patch gscam appsink memory leak (clone, fix, build) |
+| 4c | `scripts/setup_coral.sh` | Install Coral EdgeTPU runtime, pycoral, tflite, udev rule |
 | 5 | `scripts/setup_services.sh` | Install systemd services, JupyterLab, create log dirs |
 
 > **Reboot required:** Phase 2 modifies UART and Bluetooth kernel settings that require a reboot. The script will detect this and prompt you. After rebooting, re-run `./scripts/setup_all.sh` — already-completed phases are skipped automatically.
@@ -360,6 +361,33 @@ ros2 run gscam gscam_node --ros-args \
 ros2 topic echo /arducam/camera/image_raw --once
 ```
 
+### Install Coral EdgeTPU Dependencies
+
+The Coral EdgeTPU USB Accelerator is used for onboard ML inference. Pre-built packages for Ubuntu 24.04 (aarch64) are included in `depend/`.
+
+> **Note:** The Coral USB device changes its USB ID after the runtime initializes it. It appears as `1a6e:089a` (Global Unichip) when first plugged in, then switches to `18d1:9302` (Google) after the EdgeTPU firmware is loaded. The udev rule covers both IDs.
+
+1. Run the setup script:
+
+```bash
+chmod +x scripts/setup_coral.sh
+./scripts/setup_coral.sh
+```
+
+This installs:
+- `libedgetpu1-std` — EdgeTPU runtime library (`.deb`)
+- `tflite_runtime` — TensorFlow Lite interpreter (`.whl`)
+- `pycoral` — High-level Python API for EdgeTPU (`.whl`)
+- Udev rule at `/etc/udev/rules.d/99-coral-edgetpu.rules` for non-root USB access
+
+2. Verify the TPU is detected:
+
+```bash
+python3 -c "from pycoral.utils.edgetpu import list_edge_tpus; print(list_edge_tpus())"
+```
+
+You should see `[{'type': 'usb', 'path': '/sys/bus/usb/devices/...'}]`.
+
 ## Verifying Peripherals
 
 Run the following commands to confirm all peripherals are visible to the Pi:
@@ -376,7 +404,7 @@ Expected output should include:
 |---|---|
 | Intel RealSense D435i | `8086:0b3a` |
 | Arducam B0578 | `0c45:0578` |
-| Coral EdgeTPU | `1a6e:089a` (USB3 max performance) or `18d1:9302` (USB2) |
+| Coral EdgeTPU | `1a6e:089a` (pre-init) or `18d1:9302` (post-init, after firmware load) |
 
 **Pixhawk UART:**
 
@@ -391,6 +419,14 @@ Should show the device owned by the `dialout` group.
 ```bash
 v4l2-ctl --list-devices
 ```
+
+**Coral EdgeTPU:**
+
+```bash
+python3 -c "from pycoral.utils.edgetpu import list_edge_tpus; print(list_edge_tpus())"
+```
+
+Should show `[{'type': 'usb', 'path': '/sys/bus/usb/devices/...'}]`.
 
 ## Building the Package
 
@@ -418,7 +454,8 @@ colcon test --packages-select uav_neo_ros2_driver --pytest-args -k hardware -v
 | `TestPixhawk` | 6 | UART device exists, read/write permissions, dialout group, serial console disabled, SysRq disabled, Bluetooth overlay active |
 | `TestRealSense` | 5 | USB device on bus, V4L2 devices registered, rs-enumerate finds D435i, USB 3.x connection, IMU IIO permissions |
 | `TestArducam` | 4 | USB device on bus, V4L2 device listed, device node accessible, MJPEG format available |
-| `TestDependencies` | 5 | MAVROS/realsense2_camera/gscam packages installed, GeographicLib datasets, IMU fix script |
+| `TestCoralTPU` | 8 | USB device on bus (pre/post-init IDs), libedgetpu installed, tflite_runtime importable, pycoral importable, EdgeTPU runtime detects TPU, classification inference <100 ms, detection inference <50 ms, udev rule exists |
+| `TestDependencies` | 5 | MAVROS/realsense2_camera/gscam packages installed (3 parametrized), GeographicLib datasets, IMU fix script |
 
 Each test assertion includes a human-readable error message with the exact command to fix the issue.
 

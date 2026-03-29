@@ -9,6 +9,7 @@ Run with:
 """
 
 import grp
+import importlib
 import os
 import subprocess
 
@@ -278,6 +279,228 @@ class TestArducam:
         assert 'MJPG' in fmt_result.stdout or 'Motion-JPEG' in fmt_result.stdout, (
             f'MJPEG format not available on {dev}. '
             'The gscam pipeline requires MJPEG. Check camera firmware.'
+        )
+
+
+# ---------------------------------------------------------------------------
+# Coral EdgeTPU (USB 3.0)
+# ---------------------------------------------------------------------------
+
+class TestCoralTPU:
+    """Coral EdgeTPU USB Accelerator for ML inference."""
+
+    # Pre-init and post-init USB IDs
+    USB_ID_PRE = '1a6e:089a'   # Global Unichip (before firmware load)
+    USB_ID_POST = '18d1:9302'  # Google (after firmware load)
+
+    def _lsusb_ids(self):
+        result = subprocess.run(
+            ['lsusb'], capture_output=True, text=True, timeout=5,
+        )
+        ids = set()
+        for line in result.stdout.splitlines():
+            parts = line.split('ID ')
+            if len(parts) >= 2:
+                ids.add(parts[1].split()[0].lower())
+        return ids
+
+    def test_usb_device_detected(self):
+        """Coral TPU must appear on USB bus (pre-init or post-init ID)."""
+        ids = self._lsusb_ids()
+        assert self.USB_ID_PRE in ids or self.USB_ID_POST in ids, (
+            f'Coral EdgeTPU not detected on USB bus. '
+            f'Expected {self.USB_ID_PRE} (pre-init) or {self.USB_ID_POST} (post-init). '
+            'Check the USB cable and port.'
+        )
+
+    def test_libedgetpu_installed(self):
+        """libedgetpu runtime library must be installed."""
+        result = subprocess.run(
+            ['dpkg', '-l', 'libedgetpu1-std'],
+            capture_output=True, text=True, timeout=5,
+        )
+        assert result.returncode == 0 and 'ii' in result.stdout, (
+            'libedgetpu1-std not installed. '
+            'Fix: sudo dpkg -i depend/libedgetpu1-std_*.deb  '
+            'or run: scripts/setup_coral.sh'
+        )
+
+    def test_tflite_runtime_importable(self):
+        """tflite_runtime Python package must be importable."""
+        try:
+            importlib.import_module('tflite_runtime.interpreter')
+        except ImportError:
+            pytest.fail(
+                'tflite_runtime not installed. '
+                'Fix: pip3 install --break-system-packages depend/tflite_runtime-*.whl  '
+                'or run: scripts/setup_coral.sh'
+            )
+
+    def test_pycoral_importable(self):
+        """pycoral Python package must be importable."""
+        try:
+            importlib.import_module('pycoral.utils.edgetpu')
+        except ImportError:
+            pytest.fail(
+                'pycoral not installed. '
+                'Fix: pip3 install --break-system-packages depend/pycoral-*.whl  '
+                'or run: scripts/setup_coral.sh'
+            )
+
+    def test_edgetpu_runtime_detects_tpu(self):
+        """pycoral must be able to see the EdgeTPU via libedgetpu."""
+        try:
+            from pycoral.utils.edgetpu import list_edge_tpus
+        except ImportError:
+            pytest.skip('pycoral not installed')
+
+        tpus = list_edge_tpus()
+        assert len(tpus) > 0, (
+            'pycoral cannot detect any EdgeTPU devices. '
+            'The Coral is on the USB bus but libedgetpu cannot communicate with it. '
+            'Check: 1) libedgetpu1-std is installed, '
+            '2) udev rule exists at /etc/udev/rules.d/99-coral-edgetpu.rules, '
+            '3) try unplugging and replugging the Coral.'
+        )
+
+    def test_edgetpu_inference(self):
+        """Run a single inference on the EdgeTPU to verify the full stack works."""
+        try:
+            from pycoral.utils.edgetpu import make_interpreter
+            import numpy as np
+            import time
+        except ImportError:
+            pytest.skip('pycoral or numpy not installed')
+
+        model_path = os.path.join(
+            os.path.dirname(__file__), 'test_data',
+            'mobilenet_v2_1.0_224_quant_edgetpu.tflite',
+        )
+        if not os.path.isfile(model_path):
+            pytest.skip(f'Test model not found at {model_path}')
+
+        interpreter = make_interpreter(model_path)
+        interpreter.allocate_tensors()
+
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+
+        input_data = np.random.randint(
+            0, 256, size=input_details[0]['shape'],
+            dtype=np.uint8,
+        )
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+
+        # Warm-up invoke (first call loads firmware)
+        interpreter.invoke()
+
+        # Timed invoke
+        start = time.monotonic()
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+        interpreter.invoke()
+        elapsed_ms = (time.monotonic() - start) * 1000
+
+        output = interpreter.get_tensor(output_details[0]['index'])
+
+        assert output.shape[-1] == 1001, (
+            f'Expected 1001-class output, got shape {output.shape}. '
+            'The EdgeTPU model may be corrupt — re-download the test model.'
+        )
+        assert output.sum() > 0, (
+            'Inference output is all zeros. '
+            'The EdgeTPU delegate may not be running correctly.'
+        )
+        assert elapsed_ms < 100, (
+            f'Inference took {elapsed_ms:.1f} ms (expected <100 ms for MobileNet V2). '
+            'The model may be running on CPU instead of the EdgeTPU. '
+            'Check that the Coral is plugged into a USB 3.0 port.'
+        )
+
+    def test_edgetpu_detection_inference(self):
+        """Run object detection on the EdgeTPU with EfficientDet-Lite0."""
+        try:
+            from pycoral.utils.edgetpu import make_interpreter
+            import numpy as np
+            import time
+        except ImportError:
+            pytest.skip('pycoral or numpy not installed')
+
+        model_path = os.path.join(
+            os.path.dirname(__file__), 'test_data',
+            'efficientdet_lite0_generic_edgetpu.tflite',
+        )
+        if not os.path.isfile(model_path):
+            pytest.skip(f'Test model not found at {model_path}')
+
+        interpreter = make_interpreter(model_path)
+        interpreter.allocate_tensors()
+
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+
+        # EfficientDet-Lite0: 320x320 RGB input
+        assert list(input_details[0]['shape']) == [1, 320, 320, 3], (
+            f'Unexpected input shape {input_details[0]["shape"]}. '
+            'The EfficientDet-Lite0 model may be corrupt — re-download it.'
+        )
+
+        # 4 outputs: boxes, class IDs, scores, detection count
+        assert len(output_details) == 4, (
+            f'Expected 4 detection outputs, got {len(output_details)}. '
+            'The EfficientDet-Lite0 model may be corrupt — re-download it.'
+        )
+
+        input_data = np.random.randint(
+            0, 256, size=input_details[0]['shape'],
+            dtype=np.uint8,
+        )
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+
+        # Warm-up invoke
+        interpreter.invoke()
+
+        # Timed invoke
+        start = time.monotonic()
+        interpreter.set_tensor(input_details[0]['index'], input_data)
+        interpreter.invoke()
+        elapsed_ms = (time.monotonic() - start) * 1000
+
+        # Verify outputs are retrievable — output order varies by model export,
+        # so identify by shape rather than index.
+        output_shapes = [
+            tuple(interpreter.get_tensor(od['index']).shape)
+            for od in output_details
+        ]
+        has_boxes = any(s[-1] == 4 and len(s) == 3 for s in output_shapes)
+        has_count = any(s == (1,) for s in output_shapes)
+
+        assert has_boxes, (
+            f'No bounding box output (shape [1,N,4]) found. Shapes: {output_shapes}'
+        )
+        assert has_count, (
+            f'No detection count output (shape [1]) found. Shapes: {output_shapes}'
+        )
+        # EfficientDet-Lite0 runs ~26 ms on USB 3.0 Coral.
+        # 50 ms threshold catches CPU fallback (~300+ ms) without false alarms.
+        assert elapsed_ms < 50, (
+            f'Detection took {elapsed_ms:.1f} ms (expected <50 ms for EfficientDet-Lite0). '
+            'The model may be running on CPU instead of the EdgeTPU. '
+            'Check that the Coral is plugged into a USB 3.0 port.'
+        )
+
+    def test_udev_rule_exists(self):
+        """Udev rule must exist for non-root Coral access on both USB IDs."""
+        rule_path = '/etc/udev/rules.d/99-coral-edgetpu.rules'
+        assert os.path.isfile(rule_path), (
+            f'{rule_path} not found. '
+            'Fix: run scripts/setup_coral.sh to install the udev rule.'
+        )
+        with open(rule_path) as f:
+            content = f.read()
+        assert '1a6e' in content and '18d1' in content, (
+            f'{rule_path} is missing one or both Coral USB IDs '
+            '(1a6e:089a pre-init, 18d1:9302 post-init). '
+            'Fix: run scripts/setup_coral.sh'
         )
 
 

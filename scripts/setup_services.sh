@@ -83,10 +83,21 @@ if cmp -s "$UDEV_SRC" "$UDEV_DST" 2>/dev/null; then
     echo "Camera udev rules: already installed (unchanged)"
 else
     sudo cp "$UDEV_SRC" "$UDEV_DST"
-    sudo udevadm control --reload-rules
-    sudo udevadm trigger --subsystem-match=usb
     echo "Camera udev rules: installed (USB autosuspend disabled for cameras)"
 fi
+
+CORAL_UDEV_SRC="$SCRIPT_DIR/99-coral-edgetpu.rules"
+CORAL_UDEV_DST="/etc/udev/rules.d/99-coral-edgetpu.rules"
+
+if cmp -s "$CORAL_UDEV_SRC" "$CORAL_UDEV_DST" 2>/dev/null; then
+    echo "Coral udev rules: already installed (unchanged)"
+else
+    sudo cp "$CORAL_UDEV_SRC" "$CORAL_UDEV_DST"
+    echo "Coral udev rules: installed (non-root access for pre/post-init USB IDs)"
+fi
+
+sudo udevadm control --reload-rules
+sudo udevadm trigger --subsystem-match=usb
 
 # ---------------------------------------------------------------------------
 # 4. Make scripts executable

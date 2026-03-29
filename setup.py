@@ -15,6 +15,8 @@ setup(
             glob.glob('launch/*.launch.py')),
         ('share/' + package_name + '/config',
             glob.glob('config/*.yaml')),
+        ('share/' + package_name + '/models',
+            glob.glob('models/*')),
         ('share/' + package_name + '/scripts',
             glob.glob('scripts/*.sh') + glob.glob('scripts/*.py')),
         ('share/' + package_name + '/services',
@@ -29,6 +31,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'edgetpu_node = uav_neo_ros2_driver.edgetpu_node:main',
         ],
     },
 )
