@@ -193,6 +193,53 @@ The individual scripts can also be run standalone (e.g., `./scripts/setup_realse
 
 > **Note:** Pixhawk parameters (MAV_1_CONFIG, SER_TEL2_BAUD, etc.) must still be configured manually via QGroundControl. See [Pixhawk Parameter Configuration](#pixhawk-parameter-configuration) below.
 
+### After Boot
+
+All services start automatically on boot. Use these commands to manage them:
+
+**Check status:**
+
+```bash
+systemctl status uav-teleop uav-watchdog uav-dashboard uav-jupyter
+```
+
+**Restart the teleop stack** (e.g., after changing a config file or updating code):
+
+```bash
+sudo systemctl restart uav-teleop
+```
+
+**Restart with EdgeTPU inference enabled:**
+
+```bash
+sudo systemctl stop uav-teleop
+~/ros2_ws/src/uav_neo_ros2_driver/scripts/launch_teleop.sh edgetpu_enable:=true
+```
+
+**Restart individual services:**
+
+```bash
+sudo systemctl restart uav-watchdog    # node health monitor
+sudo systemctl restart uav-dashboard   # web dashboard on :8080
+sudo systemctl restart uav-jupyter     # JupyterLab on :8888
+```
+
+**Stop everything:**
+
+```bash
+sudo systemctl stop uav-teleop uav-watchdog uav-dashboard uav-jupyter
+```
+
+**View live logs:**
+
+```bash
+journalctl -u uav-teleop -f          # teleop output
+journalctl -u uav-watchdog -f        # watchdog events
+tail -f ~/logs/latest/teleop.log     # same output, plain text
+```
+
+> **Tip:** After rebuilding the workspace (`colcon build`), restart the teleop service to pick up the new code. The watchdog will automatically restart any nodes that crash.
+
 ## Manual Setup
 
 The sections below document each setup step in detail. If you used the automated setup scripts above, these are already done — use this as a reference.
