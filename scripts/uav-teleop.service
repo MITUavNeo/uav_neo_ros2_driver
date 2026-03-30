@@ -1,0 +1,19 @@
+[Unit]
+Description=UAV Neo Teleop (MAVROS + RealSense + Arducam)
+After=realsense-imu-permissions.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=uav
+Group=uav
+ExecStart=/home/uav/ros2_ws/src/uav_neo_ros2_driver/scripts/launch_teleop.sh
+Restart=on-failure
+RestartSec=10
+Environment=HOME=/home/uav
+WorkingDirectory=/home/uav/ros2_ws
+KillMode=control-group
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,30 @@
+[Unit]
+Description=UAV Neo JupyterLab (port 8888)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=uav
+Group=uav
+ExecStart=/bin/bash -c '\
+    LOG_DIR="$(readlink -f /home/uav/logs/latest 2>/dev/null || echo /home/uav/logs)"; \
+    mkdir -p "$LOG_DIR"; \
+    exec /home/uav/.local/bin/jupyter lab \
+        --ip=0.0.0.0 \
+        --port=8888 \
+        --no-browser \
+        --notebook-dir=/home/uav/jupyter_ws \
+        --ServerApp.token="" \
+        --ServerApp.password="" \
+        2>&1 | tee -a "$LOG_DIR/jupyter.log"'
+Restart=on-failure
+RestartSec=5
+Environment=HOME=/home/uav
+Environment=PYTHONPATH=/opt/ros/jazzy/lib/python3.12/site-packages:/home/uav/ros2_ws/install/uav_neo_ros2_driver/lib/python3.12/site-packages
+Environment=AMENT_PREFIX_PATH=/home/uav/ros2_ws/install/uav_neo_ros2_driver:/opt/ros/jazzy
+Environment=LD_LIBRARY_PATH=/opt/ros/jazzy/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib
+WorkingDirectory=/home/uav/jupyter_ws
+
+[Install]
+WantedBy=multi-user.target

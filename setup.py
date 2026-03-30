@@ -1,3 +1,4 @@
+import glob
 from setuptools import find_packages, setup
 
 package_name = 'uav_neo_ros2_driver'
@@ -10,7 +11,16 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', []),
+        ('share/' + package_name + '/launch',
+            glob.glob('launch/*.launch.py')),
+        ('share/' + package_name + '/config',
+            glob.glob('config/*.yaml')),
+        ('share/' + package_name + '/models',
+            glob.glob('models/*')),
+        ('share/' + package_name + '/scripts',
+            glob.glob('scripts/*.sh') + glob.glob('scripts/*.py')),
+        ('share/' + package_name + '/services',
+            glob.glob('scripts/*.service')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,6 +31,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'edgetpu_node = uav_neo_ros2_driver.edgetpu_node:main',
+            'mux_node = uav_neo_ros2_driver.mux_node:main',
         ],
     },
 )

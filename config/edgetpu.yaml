@@ -1,0 +1,47 @@
+# EdgeTPU inference node configuration for UAV Neo
+#
+# Runs object detection on the Coral USB Accelerator and publishes results
+# to /edgetpu/inference (vision_msgs/Detection2DArray).
+#
+# Enable in teleop launch:
+#   ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true
+#
+# Use a custom config:
+#   ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_config:=/path/to/custom.yaml
+#
+# Paths are relative to the uav_neo_ros2_driver package share directory.
+# Example: "models/my_model_edgetpu.tflite" resolves to
+#   <install>/share/uav_neo_ros2_driver/models/my_model_edgetpu.tflite
+
+edgetpu_node:
+  ros__parameters:
+    # --- Model ---
+
+    # Path to the EdgeTPU-compiled .tflite model (relative to package share)
+    # Must be compiled with edgetpu_compiler (x86 only) before deploying to Pi
+    model_path: "models/efficientdet_lite0_generic_edgetpu.tflite"
+
+    # Path to the labels file, one class name per line (relative to package share)
+    # Leave empty to use numeric class IDs
+    labels_path: "models/labels.txt"
+
+    # --- Detection ---
+
+    # Minimum confidence score to include a detection (0.0 - 1.0)
+    score_threshold: 0.5
+
+    # Maximum number of detections to publish per frame (0 = no limit)
+    max_detections: 0
+
+    # --- Input ---
+
+    # Image topic to subscribe to (uses the relay name from teleop.launch.py)
+    image_topic: "/camera/forward"
+
+    # --- Performance ---
+
+    # Diagnostics publish period in seconds
+    diagnostics_period: 1.0
+
+    # Image stale timeout in seconds (triggers WARN diagnostic)
+    image_timeout: 5.0

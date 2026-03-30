@@ -1,0 +1,27 @@
+# MAVROS plugin configuration for UAV Neo
+# Enable vibration monitoring, disable unused plugins
+
+/**:
+  ros__parameters:
+    plugin_denylist:
+      - image_pub
+      - distance_sensor
+      - rangefinder
+      - wheel_odometry
+      - px4flow
+      - companion_process_status
+      - debug_value
+      - esc_status
+      - esc_telemetry
+      - vibration
+
+    # Uncomment to restrict to only specific plugins:
+    # plugin_allowlist:
+    #   - 'sys_*'
+    #   - 'imu'
+    #   - 'rc_io'
+    #   - 'command'
+    #   - 'local_position'
+    #   - 'global_position'
+    #   - 'setpoint_*'
+    #   - 'battery'
