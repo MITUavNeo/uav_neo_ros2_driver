@@ -6,6 +6,9 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 
 - [Overview](#overview)
 - [Hardware](#hardware)
+- [Two-Pilot Operation](#two-pilot-operation)
+- [Safety Architecture](#safety-architecture)
+- [Topic Architecture](#topic-architecture)
 - [Quick Start (Automated Setup)](#quick-start-automated-setup)
 - [Manual Setup](#manual-setup)
   - [Install ROS2 Jazzy](#install-ros2-jazzy)
@@ -17,6 +20,7 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
   - [Install MAVROS](#install-mavros)
   - [Install RealSense Camera Driver](#install-realsense-camera-driver)
   - [Install Arducam Global Shutter Camera Driver](#install-arducam-global-shutter-camera-driver)
+  - [Install Coral EdgeTPU Dependencies](#install-coral-edgetpu-dependencies)
 - [Verifying Peripherals](#verifying-peripherals)
 - [Building the Package](#building-the-package)
 - [Testing](#testing)
@@ -25,6 +29,8 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
   - [RealSense D435i](#realsense-d435i)
   - [Arducam B0578](#arducam-b0578)
   - [All Sensors (Teleop)](#all-sensors-teleop)
+  - [Mux Node](#mux-node)
+  - [EdgeTPU Inference](#edgetpu-inference)
 - [Services](#services)
   - [Teleop Autostart](#teleop-autostart)
   - [Node Watchdog](#node-watchdog)
@@ -45,6 +51,113 @@ UAV Neo is an educational autonomous drone platform. This ROS2 package provides 
 | Arducam B0578 2.3MP | USB 2.0 | `/dev/video*` | Downward-facing global shutter camera for optical flow |
 | Coral EdgeTPU USB Accelerator | USB 3.0 | N/A (via `libedgetpu`) | ML inference accelerator for onboard AI |
 | Pixhawk 2.8.4 (clone) | UART (TELEM2) | `/dev/ttyAMA0` | Flight controller running PX4 |
+| Xbox-compatible controller | USB (wireless dongle) | `/dev/input/js0` | Autonomy operator gamepad for student programs |
+
+## Two-Pilot Operation
+
+UAV Neo requires **two operators** for safe flight:
+
+| Role | Controller | Responsibility |
+|---|---|---|
+| **Safety pilot** | RC transmitter (bound to Pixhawk) | Manual flight, takeoff/landing, emergency override. Has physical override via flight mode switch. |
+| **Autonomy operator** | Xbox controller (connected to Pi) | Runs student programs, triggers autonomous behaviors via the student library API. |
+
+**Safety pilot RC switch assignments:**
+
+| Switch | Channel | Function |
+|---|---|---|
+| Switch A | CH5 | Arm / Disarm |
+| Switch B | CH6 | Flight mode: Manual / Altitude / Stabilized |
+| Switch C | CH7 | Loiter (position hold) |
+| Switch D | CH8 | OFFBOARD (enables Pi control) |
+
+**PX4 mode priority** (highest first): OFFBOARD > Loiter > Flight mode switch. Flipping Switch D off immediately returns control to the safety pilot regardless of what the Pi is doing.
+
+**Autonomy operator Xbox controls:**
+
+| Input | Function |
+|---|---|
+| **LB held** | Manual mode — Xbox sticks control the drone through the mux |
+| **RB held** | Auto mode — student code controls the drone through the mux |
+| **Neither bumper** | Idle — zero velocity (hover) |
+| **Both bumpers** | Idle — zero velocity (hover) |
+| START | Enter student program mode |
+| BACK | Return to default mode |
+| START + BACK | Exit program |
+
+The Xbox controller has **no direct connection** to the flight controller. All commands pass through the mux node, which enforces speed limits from `config/mux.yaml`.
+
+## Safety Architecture
+
+The system has multiple layers of safety to prevent uncontrolled flight:
+
+**1. Mux node (`mux_node`)** — Arbitrates all velocity commands. Student code cannot send flight commands directly to MAVROS. The mux enforces:
+- Speed limits (`max_speed` and `max_yaw_rate` from `config/mux.yaml`)
+- Bumper gating (commands only pass through when LB or RB is held)
+- Xbox controller disconnect detection (500ms timeout → zero velocity)
+
+**2. PX4 OFFBOARD timeout** — If the Pi stops sending setpoints for more than `COM_OF_LOSS_T` (1.0s), PX4 automatically exits OFFBOARD mode and reverts to the safety pilot's RC mode switch setting.
+
+**3. RC transmitter override** — The safety pilot can switch out of OFFBOARD mode at any time via Switch D. This is a hardware-level override that cannot be blocked by software.
+
+**4. Student code isolation** — The student library cannot:
+- Arm or disarm the motors
+- Change flight modes (OFFBOARD, STABILIZED, etc.)
+- Set the speed limit (enforced by mux config, not student code)
+- Publish directly to MAVROS velocity topics (all commands go through `/mux/cmd_vel`)
+
+**5. Exception handling** — If student code crashes, the library catches the exception, logs it, and sends a stop command (zero velocity). The run loop continues operating.
+
+**Required PX4 parameters** (set via QGroundControl):
+
+| Parameter | Value | Purpose |
+|---|---|---|
+| `COM_OF_LOSS_T` | `1.0` | Seconds without setpoints before OFFBOARD failsafe |
+| `COM_RCL_EXCEPT` | `4` | Allow OFFBOARD even if RC link drops |
+| `RC_MAP_OFFB_SW` | `8` | Channel 8 (Switch D) controls OFFBOARD mode |
+
+## Topic Architecture
+
+The driver publishes sensor data on standard ROS2 topic names. The teleop launch file creates topic relays that map these to simplified names used by the student library:
+
+**Sensor topics (relay mapping):**
+
+| Driver publishes | Relay name | Description |
+|---|---|---|
+| `/camera/color/image_raw` | `/camera/forward` | RealSense forward color image |
+| `/camera/depth/image_rect_raw` | `/camera/depth` | RealSense depth image (16UC1, mm) |
+| `/arducam/camera/image_raw` | `/camera/nadir` | Arducam downward-facing image |
+| `/mavros/global_position/global` | `/nav` | GPS position (NavSatFix) |
+| `/mavros/local_position/velocity_body` | `/velocity` | Body-frame velocity (TwistStamped) |
+
+**Flight command flow:**
+
+```
+Student code                Xbox controller
+     │                            │
+ send_pcmd()                  joy_node
+     │                            │
+ /mux/cmd_vel              /joy (buttons + axes)
+     │                            │
+     └──────────┬─────────────────┘
+                │
+           mux_node (LB/RB gating + speed limit)
+                │
+  /mavros/setpoint_velocity/cmd_vel
+                │
+           MAVROS → MAVLink → Pixhawk
+```
+
+**Other topics:**
+
+| Topic | Type | Description |
+|---|---|---|
+| `/mavros/imu/data` | `sensor_msgs/Imu` | Pixhawk EKF-fused IMU (used by student library) |
+| `/mavros/state` | `mavros_msgs/State` | Flight mode, armed status, connection state |
+| `/mavros/extended_state` | `mavros_msgs/ExtendedState` | Landed state (on ground, in air, etc.) |
+| `/mavros/rc/in` | `mavros_msgs/RCIn` | Raw RC transmitter channels (for diagnostics) |
+| `/edgetpu/inference` | `vision_msgs/Detection2DArray` | EdgeTPU object detection results |
+| `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | System health from all nodes |
 
 ## Quick Start (Automated Setup)
 
@@ -232,7 +345,7 @@ MAVROS provides a standard ROS2 interface to the Pixhawk over MAVLink, publishin
 1. Install MAVROS and its dependencies:
 
 ```bash
-sudo apt install -y ros-jazzy-mavros ros-jazzy-mavros-extras ros-jazzy-mavros-msgs
+sudo apt install -y ros-jazzy-mavros ros-jazzy-mavros-extras ros-jazzy-mavros-msgs ros-jazzy-joy ros-jazzy-topic-tools
 ```
 
 2. Install the GeographicLib datasets (required for coordinate transforms):
@@ -455,7 +568,7 @@ colcon test --packages-select uav_neo_ros2_driver --pytest-args -k hardware -v
 | `TestRealSense` | 5 | USB device on bus, V4L2 devices registered, rs-enumerate finds D435i, USB 3.x connection, IMU IIO permissions |
 | `TestArducam` | 4 | USB device on bus, V4L2 device listed, device node accessible, MJPEG format available |
 | `TestCoralTPU` | 8 | USB device on bus (pre/post-init IDs), libedgetpu installed, tflite_runtime importable, pycoral importable, EdgeTPU runtime detects TPU, classification inference <100 ms, detection inference <50 ms, udev rule exists |
-| `TestDependencies` | 5 | MAVROS/realsense2_camera/gscam packages installed (3 parametrized), GeographicLib datasets, IMU fix script |
+| `TestDependencies` | 5 | ROS2 packages installed (mavros, realsense2_camera, gscam — 3 parametrized cases), GeographicLib datasets, IMU fix script |
 
 Each test assertion includes a human-readable error message with the exact command to fix the issue.
 
@@ -518,11 +631,78 @@ ros2 launch uav_neo_ros2_driver arducam.launch.py image_width:=1280 image_height
 
 ### All Sensors (Teleop)
 
-Launch MAVROS, RealSense D435i, and Arducam together:
+Launch the full stack — MAVROS, RealSense, Arducam, joy node, mux node, and topic relays:
 
 ```bash
 ros2 launch uav_neo_ros2_driver teleop.launch.py
 ```
+
+With EdgeTPU inference enabled:
+
+```bash
+ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true
+```
+
+**Available launch arguments:**
+
+| Argument | Default | Description |
+|---|---|---|
+| `fcu_url` | `/dev/ttyAMA0:921600` | Pixhawk UART connection |
+| `gcs_url` | (empty) | QGroundControl UDP bridge |
+| `pointcloud_enable` | `false` | Enable point cloud (CPU intensive) |
+| `depth_profile` | `640x480x15` | Depth stream resolution and FPS |
+| `color_profile` | `640x480x15` | Color stream resolution and FPS |
+| `arducam_width` | `640` | Arducam image width |
+| `arducam_height` | `480` | Arducam image height |
+| `arducam_framerate` | `30` | Arducam framerate |
+| `edgetpu_enable` | `false` | Enable Coral EdgeTPU inference node |
+| `edgetpu_config` | `config/edgetpu.yaml` | EdgeTPU configuration file |
+| `mux_config` | `config/mux.yaml` | Mux node configuration file |
+| `joy_device` | `/dev/input/js0` | Xbox controller device path |
+
+### Mux Node
+
+The mux node arbitrates between manual (Xbox sticks) and autonomous (student code) velocity commands. It is included automatically in the teleop launch.
+
+**Behavior:**
+- **LB held** — manual mode: Xbox stick inputs are scaled by `max_speed` and forwarded to MAVROS
+- **RB held** — auto mode: student code commands (from `/mux/cmd_vel`) are scaled and forwarded
+- **Neither bumper** — idle: zero velocity published (drone hovers)
+- **Controller disconnected** — if no `/joy` message for 500ms, zero velocity published
+
+**Stick mapping (Mode 2):**
+
+| Stick | Function |
+|---|---|
+| Left stick Y | Throttle (up/down) |
+| Left stick X | Yaw (rotation) |
+| Right stick Y | Pitch (forward/back) |
+| Right stick X | Roll (left/right) |
+
+**Configuration** (`config/mux.yaml`):
+
+| Parameter | Default | Description |
+|---|---|---|
+| `max_speed` | `0.5` | Maximum velocity in m/s for all axes |
+| `max_yaw_rate` | `0.5` | Maximum yaw rate in rad/s |
+| `joystick_dead_zone` | `0.15` | Stick dead zone (fraction, 0.0–1.0) |
+| `publish_rate` | `20.0` | Setpoint publish rate in Hz (must be >2 for PX4 OFFBOARD) |
+
+### EdgeTPU Inference
+
+When enabled via `edgetpu_enable:=true`, the EdgeTPU node subscribes to `/camera/forward`, runs object detection on the Coral USB Accelerator, and publishes results to `/edgetpu/inference` (`vision_msgs/Detection2DArray`).
+
+**Configuration** (`config/edgetpu.yaml`):
+
+| Parameter | Default | Description |
+|---|---|---|
+| `model_path` | `models/efficientdet_lite0_generic_edgetpu.tflite` | Path to EdgeTPU-compiled model (relative to package share) |
+| `labels_path` | `models/labels.txt` | Class label file |
+| `score_threshold` | `0.5` | Minimum detection confidence |
+| `max_detections` | `0` | Max detections per frame (0 = unlimited) |
+| `image_timeout` | `5.0` | Seconds without input before diagnostic warning |
+
+The default model runs at ~26ms per frame (~38 FPS) on USB 3.0.
 
 ## Services
 
@@ -530,7 +710,7 @@ Four systemd services are installed by `scripts/setup_services.sh` (or Phase 5 o
 
 ### Teleop Autostart
 
-The `uav-teleop` service launches the full sensor stack (MAVROS + RealSense + Arducam) on boot using `scripts/launch_teleop.sh`. This wrapper creates a timestamped log directory under `~/logs/` before launching.
+The `uav-teleop` service launches the full stack (MAVROS + RealSense + Arducam + joy node + mux node + topic relays) on boot using `scripts/launch_teleop.sh`. This wrapper creates a timestamped log directory under `~/logs/` before launching.
 
 ```bash
 sudo systemctl start uav-teleop    # start now
@@ -540,7 +720,7 @@ sudo systemctl restart uav-teleop  # restart (creates new log session)
 
 ### Node Watchdog
 
-The `uav-watchdog` service monitors the three sensor nodes every 5 seconds. When a node disappears:
+The `uav-watchdog` service monitors the sensor nodes and mux node every 5 seconds. When a node disappears:
 
 1. Checks if the underlying hardware is still connected (UART for Pixhawk, USB for cameras)
 2. If connected: restarts the individual node's launch file and logs rosout to `~/logs/latest/restart_<node>_<time>.log`
@@ -574,13 +754,12 @@ http://<pi-ip>:8888
 
 JupyterLab opens in the `~/jupyter_ws/` directory by default. ROS2 Python packages (`rclpy`, etc.) are available in notebooks.
 
-**Dependencies:** JupyterLab is installed in a virtual environment at `~/jupyter_venv/` by `setup_services.sh`. No authentication is required (educational use on a private network).
+**Dependencies:** JupyterLab is installed system-wide by `setup_services.sh`. No authentication is required (educational use on a private network).
 
 To install JupyterLab manually (if not using the setup script):
 
 ```bash
-python3 -m venv ~/jupyter_venv
-~/jupyter_venv/bin/pip install jupyterlab
+pip3 install --break-system-packages jupyterlab nptyping==1.4.4 pandas matplotlib Pillow
 mkdir -p ~/jupyter_ws
 ```
 

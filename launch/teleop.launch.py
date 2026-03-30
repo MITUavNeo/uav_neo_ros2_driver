@@ -1,10 +1,21 @@
-"""Launch MAVROS, RealSense D435i, and Arducam together for UAV Neo teleop."""
+"""Launch MAVROS, RealSense D435i, and Arducam together for UAV Neo teleop.
+
+Adds topic relays so the student library can use simplified names:
+    /camera/forward  ← /camera/color/image_raw
+    /camera/depth    ← /camera/depth/image_rect_raw
+    /camera/nadir    ← /arducam/camera/image_raw
+    /imu             ← fused by student library (RealSense + MAVROS)
+    /nav             ← /mavros/global_position/global
+    /velocity        ← /mavros/local_position/velocity_body
+"""
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, \
+    TimerAction, ExecuteProcess
 from launch.conditions import LaunchConfigurationEquals, LaunchConfigurationNotEquals
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 import os
 
@@ -125,6 +136,73 @@ def generate_launch_description():
         ],
     )
 
+    # -----------------------------------------------------------------
+    # Joy node: external Xbox controller for autonomy operator
+    # -----------------------------------------------------------------
+    joy_device_arg = DeclareLaunchArgument(
+        'joy_device',
+        default_value='/dev/input/js0',
+        description='Joystick device path')
+
+    joy_node = Node(
+        package='joy',
+        executable='joy_node',
+        name='joy_node',
+        output='log',
+        parameters=[{
+            'device_id': 0,
+            'deadzone': 0.05,
+            'autorepeat_rate': 20.0,
+        }],
+    )
+
+    # -----------------------------------------------------------------
+    # Mux node: arbitrates manual/auto velocity commands
+    # -----------------------------------------------------------------
+    mux_config_arg = DeclareLaunchArgument(
+        'mux_config',
+        default_value=os.path.join(pkg_dir, 'config', 'mux.yaml'),
+        description='Path to mux node config YAML')
+
+    mux_node = Node(
+        package='uav_neo_ros2_driver',
+        executable='mux_node',
+        name='mux_node',
+        output='screen',
+        parameters=[
+            LaunchConfiguration('mux_config'),
+        ],
+    )
+
+    # -----------------------------------------------------------------
+    # Topic relays: map driver topics to simplified student library names
+    # -----------------------------------------------------------------
+    relay_forward = ExecuteProcess(
+        cmd=['ros2', 'run', 'topic_tools', 'relay',
+             '/camera/color/image_raw', '/camera/forward'],
+        output='log',
+    )
+    relay_depth = ExecuteProcess(
+        cmd=['ros2', 'run', 'topic_tools', 'relay',
+             '/camera/depth/image_rect_raw', '/camera/depth'],
+        output='log',
+    )
+    relay_nadir = ExecuteProcess(
+        cmd=['ros2', 'run', 'topic_tools', 'relay',
+             '/arducam/camera/image_raw', '/camera/nadir'],
+        output='log',
+    )
+    relay_nav = ExecuteProcess(
+        cmd=['ros2', 'run', 'topic_tools', 'relay',
+             '/mavros/global_position/global', '/nav'],
+        output='log',
+    )
+    relay_velocity = ExecuteProcess(
+        cmd=['ros2', 'run', 'topic_tools', 'relay',
+             '/mavros/local_position/velocity_body', '/velocity'],
+        output='log',
+    )
+
     return LaunchDescription([
         fcu_url_arg,
         gcs_url_arg,
@@ -137,8 +215,17 @@ def generate_launch_description():
         arducam_framerate_arg,
         edgetpu_enable_arg,
         edgetpu_config_arg,
+        joy_device_arg,
+        mux_config_arg,
         mavros_launch,
+        joy_node,
+        mux_node,
         realsense_launch,
         arducam_launch,
         edgetpu_launch,
+        relay_forward,
+        relay_depth,
+        relay_nadir,
+        relay_nav,
+        relay_velocity,
     ])

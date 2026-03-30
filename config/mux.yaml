@@ -1,0 +1,40 @@
+# Velocity command mux configuration for UAV Neo
+#
+# The mux node arbitrates between manual (Xbox sticks) and auto (student
+# code) velocity commands based on the Xbox controller's bumper state:
+#   - LB held:  manual mode — Xbox sticks control the drone
+#   - RB held:  auto mode   — student code controls the drone
+#   - Neither:  idle        — zero velocity (hover)
+#   - Both:     idle        — zero velocity (hover)
+#
+# If the Xbox controller disconnects (no /joy message for >500ms),
+# the mux publishes zero velocity regardless of the last bumper state.
+#
+# The safety pilot on the RC transmitter always has override authority
+# at the PX4 level by switching out of OFFBOARD mode.
+#
+# Input topics:  /joy (Xbox controller), /mux/cmd_vel (student code)
+# Output topic:  /mavros/setpoint_velocity/cmd_vel (to MAVROS → Pixhawk)
+
+mux_node:
+  ros__parameters:
+    # --- Speed limits ---
+
+    # Maximum velocity in m/s applied to all axes (manual and auto)
+    max_speed: 0.5
+
+    # Maximum yaw rate in rad/s
+    max_yaw_rate: 0.5
+
+    # --- Joystick mapping ---
+
+    # Dead zone for Xbox analog sticks (applied to LX, LY, RX, RY axes)
+    # Values below this threshold are treated as zero to prevent drift
+    joystick_dead_zone: 0.15
+
+    # --- Publishing ---
+
+    # Rate at which the mux publishes setpoints (Hz)
+    # PX4 requires >= 2 Hz to stay in OFFBOARD mode; if setpoints stop,
+    # PX4 reverts to the safety pilot's RC mode within COM_OF_LOSS_T seconds
+    publish_rate: 20.0

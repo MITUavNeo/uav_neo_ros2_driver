@@ -32,6 +32,7 @@ setup(
     entry_points={
         'console_scripts': [
             'edgetpu_node = uav_neo_ros2_driver.edgetpu_node:main',
+            'mux_node = uav_neo_ros2_driver.mux_node:main',
         ],
     },
 )

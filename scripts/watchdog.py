@@ -53,6 +53,13 @@ NODES = {
         'restart_delay': 5,  # seconds — USB bus contention with RealSense
         'kill_pattern': 'gscam_node',
     },
+    'mux': {
+        'topic': '/mavros/setpoint_velocity/cmd_vel',
+        'launch': 'teleop.launch.py',  # mux is part of teleop launch
+        'device_check': lambda: True,  # software node, always "connected"
+        'device_label': 'mux_node (software)',
+        'kill_pattern': 'mux_node',
+    },
 }
 
 # ---------------------------------------------------------------------------

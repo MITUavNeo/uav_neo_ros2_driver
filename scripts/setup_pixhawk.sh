@@ -94,7 +94,7 @@ fi
 # --- 6. Install MAVROS ---
 echo "[6/6] Installing MAVROS..."
 source /opt/ros/jazzy/setup.bash
-sudo apt install -y ros-jazzy-mavros ros-jazzy-mavros-extras ros-jazzy-mavros-msgs
+sudo apt install -y ros-jazzy-mavros ros-jazzy-mavros-extras ros-jazzy-mavros-msgs ros-jazzy-joy ros-jazzy-topic-tools
 
 echo "  Installing GeographicLib datasets (this may take a minute)..."
 sudo /opt/ros/jazzy/lib/mavros/install_geographiclib_datasets.sh

@@ -7,7 +7,7 @@
 #   - uav-dashboard.service (web dashboard on :8080)
 #   - uav-jupyter.service   (JupyterLab on :8888)
 #
-# Also creates required directories and installs JupyterLab in a venv.
+# Also creates required directories and installs JupyterLab system-wide.
 #
 # Usage:
 #   ./scripts/setup_services.sh
@@ -42,32 +42,29 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Install JupyterLab in a virtual environment
+# 2. Install JupyterLab and Python dependencies (system-wide)
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Setting up JupyterLab ---"
 
-if [ -f "$HOME/jupyter_venv/bin/jupyter" ]; then
-    echo "JupyterLab venv already exists at ~/jupyter_venv/"
+if command -v jupyter &>/dev/null; then
+    echo "JupyterLab already installed"
 else
-    # Ensure python3-venv is installed (required on Ubuntu 24.04)
-    if ! python3 -c "import ensurepip" &>/dev/null; then
-        echo "Installing python3-venv package ..."
-        sudo apt-get install -y python3-venv 2>/dev/null || \
-            sudo apt-get install -y "python3.$(python3 -c 'import sys; print(sys.version_info.minor)')-venv"
-    fi
-    echo "Creating Python venv at ~/jupyter_venv/ (with system site-packages for ROS2) ..."
-    python3 -m venv --system-site-packages "$HOME/jupyter_venv"
     echo "Installing JupyterLab (this may take a minute on Pi 5) ..."
-    "$HOME/jupyter_venv/bin/pip" install --quiet jupyterlab
+    pip3 install --break-system-packages jupyterlab
     echo "JupyterLab installed"
 fi
 
+# Install Python dependencies required by the student library
+echo "Installing student library Python dependencies ..."
+pip3 install --break-system-packages --quiet pandas matplotlib Pillow ipywidgets luma.led_matrix luma.core spidev 2>/dev/null
+echo "Student library dependencies installed"
+
 # Verify
-if "$HOME/jupyter_venv/bin/jupyter" --version &>/dev/null; then
-    echo "JupyterLab version: $("$HOME/jupyter_venv/bin/jupyter" lab --version 2>/dev/null || echo 'unknown')"
+if jupyter --version &>/dev/null; then
+    echo "JupyterLab version: $(jupyter lab --version 2>/dev/null || echo 'unknown')"
 else
-    echo "WARNING: jupyter command not working in venv"
+    echo "WARNING: jupyter command not found"
 fi
 
 # ---------------------------------------------------------------------------

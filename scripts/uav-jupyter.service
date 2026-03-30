@@ -10,7 +10,7 @@ Group=uav
 ExecStart=/bin/bash -c '\
     LOG_DIR="$(readlink -f /home/uav/logs/latest 2>/dev/null || echo /home/uav/logs)"; \
     mkdir -p "$LOG_DIR"; \
-    exec /home/uav/jupyter_venv/bin/jupyter lab \
+    exec /home/uav/.local/bin/jupyter lab \
         --ip=0.0.0.0 \
         --port=8888 \
         --no-browser \
