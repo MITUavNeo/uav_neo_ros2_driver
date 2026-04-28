@@ -156,52 +156,37 @@ def generate_launch_description():
         }],
     )
 
-    # -----------------------------------------------------------------
-    # Mux node: arbitrates manual/auto velocity commands
-    # -----------------------------------------------------------------
-    mux_config_arg = DeclareLaunchArgument(
-        'mux_config',
-        default_value=os.path.join(pkg_dir, 'config', 'mux.yaml'),
-        description='Path to mux node config YAML')
-
-    mux_node = Node(
-        package='uav_neo_ros2_driver',
-        executable='mux_node',
-        name='mux_node',
-        output='screen',
-        parameters=[
-            LaunchConfiguration('mux_config'),
-        ],
+    # Mux: launched via standalone mux.launch.py so the watchdog can
+    # restart it without re-spawning the rest of the teleop stack.
+    mux_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(launch_dir, 'mux.launch.py')),
     )
 
-    # -----------------------------------------------------------------
-    # Topic relays: map driver topics to simplified student library names
-    # -----------------------------------------------------------------
-    relay_forward = ExecuteProcess(
-        cmd=['ros2', 'run', 'topic_tools', 'relay',
-             '/camera/color/image_raw', '/camera/forward'],
-        output='log',
-    )
-    relay_depth = ExecuteProcess(
-        cmd=['ros2', 'run', 'topic_tools', 'relay',
-             '/camera/depth/image_rect_raw', '/camera/depth'],
-        output='log',
-    )
-    relay_nadir = ExecuteProcess(
-        cmd=['ros2', 'run', 'topic_tools', 'relay',
-             '/arducam/camera/image_raw', '/camera/nadir'],
-        output='log',
-    )
-    relay_nav = ExecuteProcess(
-        cmd=['ros2', 'run', 'topic_tools', 'relay',
-             '/mavros/global_position/global', '/nav'],
-        output='log',
-    )
-    relay_velocity = ExecuteProcess(
-        cmd=['ros2', 'run', 'topic_tools', 'relay',
-             '/mavros/local_position/velocity_body', '/velocity'],
-        output='log',
-    )
+    # Image relays: use BEST_EFFORT QoS to match RealSense/gscam publishers
+    # (topic_tools/relay defaults to RELIABLE and silently drops here).
+    image_relay = os.path.join(pkg_dir, 'scripts', 'image_relay.py')
+    image_relay_pairs = [
+        ('/camera/color/image_raw',       '/camera/forward'),
+        ('/camera/depth/image_rect_raw',  '/camera/depth'),
+        ('/arducam/camera/image_raw',     '/camera/nadir'),
+    ]
+    image_relays = [
+        ExecuteProcess(cmd=['python3', image_relay, src, dst], output='log')
+        for src, dst in image_relay_pairs
+    ]
+
+    # MAVROS topics are published RELIABLE, so topic_tools/relay works fine.
+    topic_tools_relays = [
+        ExecuteProcess(
+            cmd=['ros2', 'run', 'topic_tools', 'relay', src, dst],
+            output='log',
+        )
+        for src, dst in [
+            ('/mavros/global_position/global',       '/nav'),
+            ('/mavros/local_position/velocity_body', '/velocity'),
+        ]
+    ]
 
     return LaunchDescription([
         fcu_url_arg,
@@ -216,16 +201,12 @@ def generate_launch_description():
         edgetpu_enable_arg,
         edgetpu_config_arg,
         joy_device_arg,
-        mux_config_arg,
         mavros_launch,
         joy_node,
-        mux_node,
+        mux_launch,
         realsense_launch,
         arducam_launch,
         edgetpu_launch,
-        relay_forward,
-        relay_depth,
-        relay_nadir,
-        relay_nav,
-        relay_velocity,
+        *image_relays,
+        *topic_tools_relays,
     ])

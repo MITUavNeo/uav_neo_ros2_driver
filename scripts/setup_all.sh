@@ -26,7 +26,7 @@ echo ""
 # -----------------------------------------------
 # Phase 1: ROS2 Jazzy
 # -----------------------------------------------
-echo ">>> Phase 1/5: ROS2 Jazzy"
+echo ">>> Phase 1/6: ROS2 Jazzy"
 echo "-------------------------------------------"
 if command -v ros2 &>/dev/null; then
     echo "ROS2 already installed ($(ros2 --version 2>/dev/null || echo 'unknown version')). Skipping."
@@ -39,7 +39,7 @@ echo ""
 # -----------------------------------------------
 # Phase 2: Pixhawk UART + MAVROS
 # -----------------------------------------------
-echo ">>> Phase 2/5: Pixhawk UART + MAVROS"
+echo ">>> Phase 2/6: Pixhawk UART + MAVROS"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_pixhawk.sh"
 echo ""
@@ -81,7 +81,7 @@ fi
 # -----------------------------------------------
 # Phase 3: RealSense D435i
 # -----------------------------------------------
-echo ">>> Phase 3/5: RealSense D435i"
+echo ">>> Phase 3/6: RealSense D435i"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_realsense.sh"
 echo ""
@@ -89,7 +89,7 @@ echo ""
 # -----------------------------------------------
 # Phase 4: Arducam B0578
 # -----------------------------------------------
-echo ">>> Phase 4/5: Arducam B0578"
+echo ">>> Phase 4/6: Arducam B0578"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_arducam.sh"
 echo ""
@@ -124,9 +124,17 @@ echo ""
 # -----------------------------------------------
 # Phase 5: Services
 # -----------------------------------------------
-echo ">>> Phase 5/5: Services (teleop, watchdog, dashboard, JupyterLab)"
+echo ">>> Phase 5/6: Services (teleop, watchdog, dashboard, JupyterLab)"
 echo "-------------------------------------------"
 bash "$SCRIPT_DIR/setup_services.sh"
+echo ""
+
+# -----------------------------------------------
+# Phase 6: Networking (eth0 dual-IP + wlan0 AP)
+# -----------------------------------------------
+echo ">>> Phase 6/6: Networking (eth0 dual-IP + isolated wlan0 AP)"
+echo "-------------------------------------------"
+bash "$SCRIPT_DIR/setup_networking.sh"
 echo ""
 
 echo "============================================"
