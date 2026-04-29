@@ -105,9 +105,10 @@ def generate_launch_description():
         default_value=os.path.join(pkg_dir, 'config', 'edgetpu.yaml'),
         description='Path to EdgeTPU config YAML')
 
-    # Include EdgeTPU launch (delayed 3s to allow RealSense to start publishing)
+    # Include EdgeTPU launch (delayed 10s to let Coral USB firmware enumeration
+    # and udev settle after boot — load_delegate fails if it runs too early).
     edgetpu_launch = TimerAction(
-        period=3.0,
+        period=10.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
