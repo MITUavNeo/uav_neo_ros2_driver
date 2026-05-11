@@ -22,13 +22,41 @@ from pathlib import Path
 # Configuration
 # ---------------------------------------------------------------------------
 
-POLL_INTERVAL = 5        # seconds between health checks
-RESTART_COOLDOWN = 30    # minimum seconds between restarts of the same node
-STARTUP_GRACE = 15       # seconds to wait before first check (set in systemd too)
+POLL_INTERVAL = 5            # seconds between health checks
+RESTART_COOLDOWN = 30        # minimum seconds between restarts of the same node
+STARTUP_GRACE = 15           # seconds to wait before first check (set in systemd too)
+SHM_CLEANUP_INTERVAL = 60    # seconds between FastRTPS shm orphan sweeps
 
-# Each monitored node group: a friendly name, a topic that proves it is alive,
-# the device-check callable, and the launch file to restart it.
 PACKAGE = 'uav_neo_ros2_driver'
+
+# Executable-path substrings used by `process_check`. Specific enough to
+# distinguish the running node binary from `ros2 launch` wrappers in pgrep -f.
+MAVROS_EXECUTABLE_PATH = '/lib/mavros/mavros_node'
+REALSENSE_EXECUTABLE_PATH = '/realsense2_camera/realsense2_camera_node'
+GSCAM_EXECUTABLE_PATH = '/install/gscam/lib/gscam/gscam_node'
+MUX_EXECUTABLE_PATH = '/lib/uav_neo_ros2_driver/mux_node'
+
+
+def _is_running(path_substring: str):
+    """Return a process_check callable that pgreps for the given path substring.
+
+    Topic-based liveness gives false positives whenever another node on the
+    same Pi subscribes to the same topic — image_relay.py keeps the camera
+    topics alive after their publishers die, MAVROS holds /mavros/state and
+    /mavros/setpoint_velocity/cmd_vel. process_check closes that gap.
+    """
+    def check() -> bool:
+        try:
+            r = subprocess.run(
+                ['pgrep', '-f', path_substring],
+                capture_output=True, timeout=3,
+            )
+            return r.returncode == 0
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            log.warning('pgrep(%s) failed: %s', path_substring, exc)
+            return True  # conservative: don't restart on check error
+    return check
+
 
 NODES = {
     'mavros': {
@@ -37,6 +65,7 @@ NODES = {
         'device_check': lambda: os.path.exists('/dev/ttyAMA0'),
         'device_label': '/dev/ttyAMA0 (UART)',
         'kill_pattern': 'mavros_node',  # process name to pkill before restart
+        'process_check': _is_running(MAVROS_EXECUTABLE_PATH),
     },
     'realsense': {
         'topic': '/camera/color/image_raw',
@@ -44,6 +73,7 @@ NODES = {
         'device_check': lambda: _usb_device_present('8086:0b3a'),
         'device_label': 'USB 8086:0b3a (RealSense D435i)',
         'kill_pattern': 'realsense2_camera_node',
+        'process_check': _is_running(REALSENSE_EXECUTABLE_PATH),
     },
     'arducam': {
         'topic': '/arducam/camera/image_raw',
@@ -52,13 +82,15 @@ NODES = {
         'device_label': 'USB 0c45:0578 (Arducam B0578)',
         'restart_delay': 5,  # seconds — USB bus contention with RealSense
         'kill_pattern': 'gscam_node',
+        'process_check': _is_running(GSCAM_EXECUTABLE_PATH),
     },
     'mux': {
         'topic': '/mavros/setpoint_velocity/cmd_vel',
-        'launch': 'teleop.launch.py',  # mux is part of teleop launch
+        'launch': 'mux.launch.py',  # standalone — using teleop.launch.py would re-spawn the whole stack
         'device_check': lambda: True,  # software node, always "connected"
         'device_label': 'mux_node (software)',
         'kill_pattern': 'mux_node',
+        'process_check': _is_running(MUX_EXECUTABLE_PATH),
     },
 }
 
@@ -77,6 +109,57 @@ log = logging.getLogger('watchdog')
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _find_rpi_volt_alarm() -> "Path | None":
+    """Locate the Pi 5 PMIC low-voltage sticky alarm flag.
+
+    hwmon enumeration order is not stable, so resolve by the driver's `name`
+    attribute. Reads as 0 normally; flips to 1 after the first under-voltage
+    event since boot and stays 1 until reboot.
+    """
+    for h in Path('/sys/class/hwmon').glob('hwmon*'):
+        try:
+            if (h / 'name').read_text().strip() == 'rpi_volt':
+                alarm = h / 'in0_lcrit_alarm'
+                if alarm.exists():
+                    return alarm
+        except OSError:
+            continue
+    return None
+
+
+def _clean_fastrtps_orphans() -> int:
+    """Remove 0-byte /dev/shm/fastrtps_port* segments and stranded lock files.
+
+    These appear when a rclpy process is killed mid-initialization. A new
+    participant that hashes to the same port spins forever waiting for the
+    segment to grow — the fingerprint of the "Jupyter cell 3 hang".
+    Returns number of files removed.
+    """
+    shm = Path('/dev/shm')
+    removed = 0
+    for port in shm.glob('fastrtps_port*'):
+        if port.name.endswith('_el'):
+            continue
+        try:
+            if port.stat().st_size == 0:
+                (shm / f'{port.name}_el').unlink(missing_ok=True)
+                (shm / f'sem.{port.name}_mutex').unlink(missing_ok=True)
+                port.unlink(missing_ok=True)
+                removed += 1
+        except (OSError, FileNotFoundError):
+            pass
+    for el in shm.glob('fastrtps_port*_el'):
+        data = shm / el.name[:-len('_el')]
+        if not data.exists():
+            try:
+                (shm / f'sem.{data.name}_mutex').unlink(missing_ok=True)
+                el.unlink(missing_ok=True)
+                removed += 1
+            except (OSError, FileNotFoundError):
+                pass
+    return removed
+
+
 def _usb_device_present(usb_id: str) -> bool:
     """Check whether a USB vendor:product ID appears in lsusb output."""
     try:
@@ -89,7 +172,15 @@ def _usb_device_present(usb_id: str) -> bool:
 
 
 def _get_active_topics() -> set[str]:
-    """Return the set of currently advertised ROS2 topics."""
+    """Return the set of currently advertised ROS2 topics.
+
+    Note: a topic appears here if any participant advertises OR subscribes
+    to it, so MAVROS's subscription keeps /mavros/setpoint_velocity/cmd_vel
+    in the list even after mux_node dies. That weakens mux-death detection
+    but is strictly safer than a publisher-count check — the rclpy graph
+    API has subtle discovery-timing issues across node restarts that can
+    produce false negatives and cascade-restart a healthy stack.
+    """
     try:
         result = subprocess.run(
             ['ros2', 'topic', 'list'],
@@ -223,6 +314,25 @@ def main() -> None:
     log.info('Watchdog started — monitoring: %s', ', '.join(NODES.keys()))
     log.info('Log directory: %s', logdir)
 
+    volt_alarm_path = _find_rpi_volt_alarm()
+    volt_alarm_seen = False
+    if volt_alarm_path is None:
+        log.info('Pi under-voltage alarm: rpi_volt hwmon not found (skipping check)')
+    else:
+        try:
+            if volt_alarm_path.read_text().strip() == '1':
+                log.warning('Pi under-voltage alarm already set at watchdog start '
+                            '(under-voltage occurred earlier this boot)')
+                volt_alarm_seen = True
+            else:
+                log.info('Pi under-voltage alarm armed (%s)', volt_alarm_path)
+        except OSError:
+            pass
+
+    startup_removed = _clean_fastrtps_orphans()
+    if startup_removed:
+        log.info('Cleaned %d FastRTPS SHM orphan(s) at startup', startup_removed)
+
     # Deprioritise MAVROS (CPU-bound serial I/O, tolerates nice 5) so the
     # camera pipelines get more scheduling time.  This boosts camera publish
     # rates from ~13-16 Hz to ~25-32 Hz with negligible MAVROS impact.
@@ -236,14 +346,47 @@ def main() -> None:
     except (subprocess.TimeoutExpired, OSError):
         log.warning('Failed to renice mavros_node')
 
+    last_shm_cleanup = time.monotonic()
     while _running:
         topics = _get_active_topics()
 
+        if time.monotonic() - last_shm_cleanup >= SHM_CLEANUP_INTERVAL:
+            last_shm_cleanup = time.monotonic()
+            n = _clean_fastrtps_orphans()
+            if n:
+                log.info('Cleaned %d FastRTPS SHM orphan(s)', n)
+
+        if volt_alarm_path is not None and not volt_alarm_seen:
+            try:
+                if volt_alarm_path.read_text().strip() == '1':
+                    log.warning('Pi under-voltage alarm tripped — 5V rail dipped '
+                                'below threshold (USB devices may have reset). '
+                                'Likely cause: uBEC margin too low under flight load.')
+                    volt_alarm_seen = True
+            except OSError:
+                pass
+
         for name, cfg in NODES.items():
             topic = cfg['topic']
-            alive = topic in topics
+            topic_alive = topic in topics
+            # `ros2 topic list` includes subscriber-only topics, so the topic
+            # check alone gives false positives whenever any other node on the
+            # bus subscribes (image_relay holds the camera topics; MAVROS
+            # holds /mavros/setpoint_velocity/cmd_vel). process_check pgreps
+            # for the actual node binary to close that gap.
+            proc_check = cfg.get('process_check')
+            if proc_check is not None:
+                proc_alive = proc_check()
+            else:
+                proc_alive = True
+            alive = topic_alive and proc_alive
+            failure = (
+                'topic+process down' if not topic_alive and not proc_alive else
+                'topic not advertised' if not topic_alive else
+                'process not running' if not proc_alive else
+                None
+            )
 
-            # Also check if a child we restarted has exited unexpectedly
             child = _child_procs.get(name)
             if child and child.poll() is not None:
                 log.warning('%s: restarted child PID %d exited with code %s',
@@ -253,15 +396,14 @@ def main() -> None:
             if alive:
                 continue
 
-            # Node is missing — check hardware
             device_ok = cfg['device_check']()
             if not device_ok:
-                log.warning('%s: topic %s missing — device %s NOT connected, '
-                            'skipping restart', name, topic, cfg['device_label'])
+                log.warning('%s: %s — device %s NOT connected, skipping restart',
+                            name, failure, cfg['device_label'])
                 continue
 
-            log.warning('%s: topic %s missing — device %s connected, '
-                        'attempting restart', name, topic, cfg['device_label'])
+            log.warning('%s: %s — device %s connected, attempting restart',
+                        name, failure, cfg['device_label'])
             _restart_node(name, cfg)
 
         # Sleep in short increments so we can respond to signals promptly

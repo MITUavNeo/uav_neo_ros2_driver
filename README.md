@@ -1,9 +1,38 @@
 # UAV Neo ROS2 Driver
 
+**Version: v1.0.0**
+
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
+
+## What's in this repository
+
+- **Sensor stack** — RealSense D435i (depth + color + IMU), Arducam B0578 (downward global shutter), Coral EdgeTPU (object detection at ~26 ms/frame).
+- **Flight controller link** — MAVROS over UART to a Pixhawk running PX4.
+- **Two-pilot architecture** — RC safety pilot for emergency override (hardware-level via OFFBOARD switch); Xbox autonomy operator drives the mux node which arbitrates manual/auto velocity commands and enforces speed limits.
+- **Image-topic relays** — a small QoS-matched [`image_relay.py`](scripts/image_relay.py) that fixes the silent `topic_tools/relay` BEST_EFFORT/RELIABLE mismatch for camera streams.
+- **Standalone `mux.launch.py`** — used by the watchdog to restart the mux without re-spawning the entire teleop stack.
+- **Watchdog** — five-second-poll process supervisor with topic+process liveness checks (the topic-only check gives false positives whenever any relay subscribes), per-node restart cooldown, FastRTPS shared-memory orphan cleanup, and Pi 5 PMIC under-voltage detection (`/sys/class/hwmon/hwmon5/in0_lcrit_alarm`).
+- **Four systemd services** — `uav-teleop` (launches the full stack with EdgeTPU on by default), `uav-watchdog`, `uav-dashboard` (`:8080`), `uav-jupyter` (`:8888`). All start at boot.
+- **Networking** — eth0 carries a static `192.168.52.200/24` (laptop tether) **and** a DHCP address (router) simultaneously; wlan0 runs as an isolated AP `uav-neo-0` (10.42.0.1/24, FORWARD blocked so clients reach the Pi's services but not the internet).
+- **Setup automation** — `setup_all.sh` runs six phases (ROS2 → Pixhawk/MAVROS → RealSense → Arducam + gscam patch + Coral → services → networking) idempotently.
+
+## Release notes
+
+### v1.0.0 — initial release
+
+- Full sensor + flight stack working with two-pilot operation
+- EdgeTPU inference auto-starts at boot
+- Watchdog detects node death even when relays keep topics in the DDS graph
+- `mux.launch.py` prevents cascade-restart from a mux blip
+- `launch_teleop.sh` cleans 0-byte FastRTPS SHM segments on each (re)start
+- gscam patched for the appsink memory leak; build is shadowed in colcon overlay
+- USB autosuspend disabled by udev rule for both cameras
+- eth0 dual-IP + isolated wlan0 AP automated by `setup_networking.sh`
 
 ## Table of Contents
 
+- [What's in this repository](#whats-in-this-repository)
+- [Release notes](#release-notes)
 - [Overview](#overview)
 - [Hardware](#hardware)
 - [Two-Pilot Operation](#two-pilot-operation)
@@ -37,6 +66,10 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
   - [Web Dashboard](#web-dashboard)
   - [JupyterLab](#jupyterlab)
   - [Managing Services](#managing-services)
+- [Networking](#networking)
+  - [eth0 — dual-IP (static + DHCP)](#eth0--dual-ip-static--dhcp)
+  - [wlan0 — isolated access point](#wlan0--isolated-access-point)
+  - [Setup](#setup)
 - [Logging](#logging)
 
 ## Overview
@@ -209,11 +242,11 @@ systemctl status uav-teleop uav-watchdog uav-dashboard uav-jupyter
 sudo systemctl restart uav-teleop
 ```
 
-**Restart with EdgeTPU inference enabled:**
+**EdgeTPU inference is enabled by default** in the systemd boot path (`launch_teleop.sh` passes `edgetpu_enable:=true`). To disable for a session, override on the command line:
 
 ```bash
 sudo systemctl stop uav-teleop
-~/ros2_ws/src/uav_neo_ros2_driver/scripts/launch_teleop.sh edgetpu_enable:=true
+~/ros2_ws/src/uav_neo_ros2_driver/scripts/launch_teleop.sh edgetpu_enable:=false
 ```
 
 **Restart individual services:**
@@ -678,17 +711,19 @@ ros2 launch uav_neo_ros2_driver arducam.launch.py image_width:=1280 image_height
 
 ### All Sensors (Teleop)
 
-Launch the full stack — MAVROS, RealSense, Arducam, joy node, mux node, and topic relays:
+Launch the full stack — MAVROS, RealSense, Arducam, joy node, mux (via `mux.launch.py`), topic relays, and (by default in the systemd boot path) EdgeTPU inference:
 
 ```bash
 ros2 launch uav_neo_ros2_driver teleop.launch.py
 ```
 
-With EdgeTPU inference enabled:
+The systemd service (`scripts/launch_teleop.sh`) passes `edgetpu_enable:=true` automatically. The launch file's own default is `false`, so calling `ros2 launch` directly leaves EdgeTPU off unless you opt in:
 
 ```bash
 ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true
 ```
+
+The launch also uses `image_relay.py` (a 30-line QoS-matched relay) for the three image topics rather than `topic_tools/relay`. The latter defaults to RELIABLE QoS, which silently drops from BEST_EFFORT image publishers like RealSense and gscam — see [`scripts/image_relay.py`](scripts/image_relay.py).
 
 **Available launch arguments:**
 
@@ -702,9 +737,9 @@ ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true
 | `arducam_width` | `640` | Arducam image width |
 | `arducam_height` | `480` | Arducam image height |
 | `arducam_framerate` | `30` | Arducam framerate |
-| `edgetpu_enable` | `false` | Enable Coral EdgeTPU inference node |
+| `edgetpu_enable` | `false` (`true` via `launch_teleop.sh`) | Enable Coral EdgeTPU inference node |
 | `edgetpu_config` | `config/edgetpu.yaml` | EdgeTPU configuration file |
-| `mux_config` | `config/mux.yaml` | Mux node configuration file |
+| `mux_config` | `config/mux.yaml` | Mux node configuration file (consumed by `mux.launch.py`) |
 | `joy_device` | `/dev/input/js0` | Xbox controller device path |
 
 ### Mux Node
@@ -769,12 +804,18 @@ sudo systemctl restart uav-teleop  # restart (creates new log session)
 
 The `uav-watchdog` service monitors the sensor nodes and mux node every 5 seconds. When a node disappears:
 
-1. Checks if the underlying hardware is still connected (UART for Pixhawk, USB for cameras)
-2. If connected: restarts the individual node's launch file and logs rosout to `~/logs/latest/restart_<node>_<time>.log`
-3. If disconnected: logs a warning and waits for the device to reappear
-4. Enforces a 30-second cooldown between restarts of the same node
+1. Determines liveness from **two checks**: the topic appears in `ros2 topic list` *and* the node binary is in `ps`. The process check is necessary because `ros2 topic list` includes subscriber-only topics — `image_relay` keeps the camera topics in the graph, and MAVROS keeps `/mavros/setpoint_velocity/cmd_vel`, so the topic check alone gives false positives. Each `NODES` entry supplies a `process_check` callable that pgreps for the binary path (e.g. `/install/gscam/lib/gscam/gscam_node`).
+2. Checks if the underlying hardware is still connected (UART for Pixhawk, USB for cameras).
+3. If connected: kills any stale matches of the `kill_pattern`, then relaunches the **node-specific** launch file (e.g. `arducam.launch.py` for arducam, `mux.launch.py` for mux). Mux uses a standalone launch file rather than `teleop.launch.py` to prevent a mux restart from cascade-respawning the entire stack.
+4. If disconnected: logs a warning and waits for the device to reappear.
+5. Enforces a 30-second cooldown between restarts of the same node.
 
-The watchdog starts 15 seconds after teleop to allow all nodes to initialize.
+The watchdog starts 15 seconds after teleop to allow all nodes to initialize. Log entries distinguish three failure modes: `topic not advertised`, `process not running`, `topic+process down`.
+
+Two periodic background tasks also run from the watchdog:
+
+- **FastRTPS shared-memory orphan cleanup** — every 60 s, removes 0-byte `/dev/shm/fastrtps_port*` segments and stranded `_el` / `sem.*_mutex` lock files left behind by ros2 processes killed mid-init. Without this, any future `rclpy.create_node()` that hashes to a poisoned port spins forever (the "Jupyter cell hangs at drone init" symptom). `launch_teleop.sh` runs the same cleanup once on each (re)start as defense-in-depth before any rclpy participants start.
+- **Pi 5 under-voltage detection** — checks `/sys/class/hwmon/hwmon5/in0_lcrit_alarm` (sticky bit, set by the Pi PMIC on first 5V-rail dip below threshold). Logs `Pi under-voltage alarm armed (...)` at startup and a single `[WARNING] Pi under-voltage alarm tripped — ...` the moment the bit flips. After any flight, `grep under-voltage ~/logs/latest/watchdog.log` will tell you whether the BEC sagged. If it did, expect cascading USB device resets (gscam in particular dies with `Could not get gstreamer sample`); the fix is hardware (5V/5A+ BEC, bulk caps near the Pi, or a separate USB power injector).
 
 ### Web Dashboard
 
@@ -837,6 +878,56 @@ journalctl -u uav-teleop -f         # teleop output
 journalctl -u uav-watchdog -f       # watchdog events
 journalctl -u uav-dashboard -f      # dashboard server
 journalctl -u uav-jupyter -f        # JupyterLab server
+```
+
+## Networking
+
+The Pi has two network interfaces, each configured for a specific role.
+
+### eth0 — dual-IP (static + DHCP)
+
+eth0 carries both a fixed static address for direct laptop tethering **and** a DHCP-assigned address from any router it's plugged into, simultaneously. Either path reaches every service on the Pi.
+
+| Address | Source | Use case |
+|---|---|---|
+| `192.168.52.200/24` | static | Laptop direct-connect (no router needed) |
+| `10.0.0.x/24` (or whatever DHCP gives) | DHCP from connected router | Internet access for the Pi, easy network connectivity |
+
+The default route comes from DHCP when present, so the Pi has internet access whenever it's on a router. Direct-tether keeps working at `192.168.52.200` regardless. Configuration lives in a single netplan file managed by NetworkManager (`/etc/netplan/90-NM-…yaml`) using `ipv4.method: auto`, `ipv4.addresses: [192.168.52.200/24]`, `optional: true`, and `ipv4.may-fail: true`. **Do not put network setup in launch scripts** — netplan is the source of truth.
+
+> **Subnet caveat:** if your router happens to also be on `192.168.52.0/24`, you'll get an address collision. Pick a different static subnet for the Pi in that case.
+
+### wlan0 — isolated access point
+
+wlan0 runs as an isolated Wi-Fi access point so laptops, tablets, and phones can connect directly to the drone for SSH / Jupyter / dashboard access without an external router.
+
+| Setting | Value |
+|---|---|
+| SSID | `uav-neo-0` |
+| PSK | `uavneo@mit` |
+| Mode | WPA2-PSK, 2.4 GHz, channel 6 |
+| Pi address | `10.42.0.1/24` |
+| DHCP for clients | `10.42.0.10 – 10.42.0.254` (NM's internal dnsmasq, 1-hour leases) |
+| Internet for clients | **blocked** — see isolation note below |
+
+Once a client connects, it can reach `http://10.42.0.1:8080` (dashboard), `http://10.42.0.1:8888` (Jupyter), or SSH to `10.42.0.1`. It **cannot** route out to the internet through the Pi — even though the Pi itself has internet via eth0. The isolation is enforced by a NetworkManager dispatcher script at `/etc/NetworkManager/dispatcher.d/99-uav-ap-isolate` that inserts `iptables FORWARD … -j REJECT` rules whenever the AP comes up and removes them on down. Rules are reinstalled by the dispatcher on every connection-up, so no separate persistence layer is needed.
+
+### Setup
+
+The networking setup is automated by `scripts/setup_networking.sh` (run by `setup_all.sh` phase 6, or standalone):
+
+```bash
+./scripts/setup_networking.sh
+```
+
+This installs the AP-isolation dispatcher, deletes any prior Wi-Fi client connection on wlan0 (the original `Duck` connection from a previous build), creates the `uav-neo-ap` NM connection, and rewrites the eth0 netplan file for the dual-IP behavior. `netplan apply` is invoked at the end to bring everything up. You can re-run the script idempotently — it skips work that's already done.
+
+To verify after setup:
+
+```bash
+ip -br addr show eth0     # should show 192.168.52.200/24 + DHCP address
+iw dev wlan0 info         # should show ssid uav-neo-0, type AP, channel 6
+sudo iptables -L FORWARD -n | grep wlan0   # should show two REJECT rules
 ```
 
 ## Logging
