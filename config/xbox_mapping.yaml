@@ -1,0 +1,73 @@
+# UAV Neo Xbox controller mapping
+#
+# Single reference point for how the controller's buttons and sticks map onto
+# the /joy message array indices published by joy_node.
+#
+# Both consumers read this one file (via uav_neo_ros2_driver.controller_mapping):
+#   - mux_node        (ROS2 driver):     uses lb, rb, and the four stick axes
+#   - ControllerReal  (student library): uses every entry below
+#
+# CONTROLLER MODE (important)
+# The kit's ESM-9110 is a multi-mode pad. Press and HOLD the "MODE" button to
+# cycle through its modes; each is shown by the 4-LED column and enumerates as a
+# different USB device. The kit standardizes on XInput mode. The mode is sticky
+# (remembered across power cycles), so it only needs setting once per pad.
+#
+#   LED pattern        Mode         USB id      enumerates as        report
+#   -----------------  -----------  ----------  -------------------  ---------------
+#   top + bottom       XInput  <--  2f24:00b7   "Generic X-Box pad"  8 axes/11 btn  <-- USE THIS
+#   center two         DirectInput  0079:181c   "ESM GAMEPAD"        (wrong)
+#   top + third        ESM/other    2f24:00b6   "ESM Controller"     (wrong)
+#
+# In XInput mode the sticks rest at 0 and the triggers rest at +1 (standard), so
+# manual flight and the student trigger/stick math work without extra calibration.
+# The other modes (and the Switch-Pro profile some units expose, USB 057e:2009,
+# 6 axes/14 buttons with off-center sticks) do NOT match this mapping. The `report`
+# block below lets the code detect and reject a wrong-mode controller instead of
+# silently mis-reading it: if you see a "wrong controller mode" warning, hold MODE
+# until the top + bottom LEDs are lit.
+#
+# The indices were determined empirically by pressing each control and watching
+# /joy (2026-07-05). To re-map for a different controller, run `ros2 topic echo
+# /joy`, press each control to read its index, edit below, then rebuild and
+# restart the mux:
+#     colcon build --packages-select uav_neo_ros2_driver
+#     sudo systemctl restart uav-teleop
+
+# ---------------------------------------------------------------------------
+# Expected /joy report shape for the standardized mode. A message that does not
+# match is treated as a wrong-mode controller (rejected with a one-time warning)
+# rather than mis-read.
+# ---------------------------------------------------------------------------
+report:
+  buttons: 11
+  axes: 8
+
+# ---------------------------------------------------------------------------
+# Buttons: name -> index into /joy `buttons[]`  (XInput: 11 buttons)
+# ---------------------------------------------------------------------------
+buttons:
+  a: 0
+  b: 1
+  x: 2
+  y: 3
+  lb: 4            # left bumper; mux manual-mode gate
+  rb: 5            # right bumper; mux auto-mode gate
+  back: 6          # View/Back; student library: return to default mode
+  start: 7         # Menu/Start; student library: enter program mode
+  guide: 8         # Xbox/Guide button (unused by the kit)
+  left_stick: 9    # left stick click  (L3)
+  right_stick: 10  # right stick click (R3)
+
+# ---------------------------------------------------------------------------
+# Axes: name -> index into /joy `axes[]`  (XInput: 8 axes)
+# ---------------------------------------------------------------------------
+axes:
+  left_x: 0         # left stick horizontal  (right -1, left +1, rest 0)
+  left_y: 1         # left stick vertical    (up +1, down -1, rest 0)
+  left_trigger: 2   # analog left trigger    (rest +1 -> -1 fully pressed)
+  right_x: 3        # right stick horizontal (right -1, left +1, rest 0)
+  right_y: 4        # right stick vertical   (up +1, down -1, rest 0)
+  right_trigger: 5  # analog right trigger   (rest +1 -> -1 fully pressed)
+  dpad_x: 6         # d-pad horizontal
+  dpad_y: 7         # d-pad vertical

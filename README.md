@@ -1,6 +1,6 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.0.0**
+**Version: v1.1.0**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
@@ -18,7 +18,26 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 
 ## Release notes
 
-### v1.0.0 — initial release
+### v1.1.0 (2026-07-05)
+
+- Xbox controller button/axis to `/joy` index mapping moved into a single config
+  file, `config/xbox_mapping.yaml`, read by both the mux node and the student
+  library. Re-mapping a different controller is now a YAML edit, no code change.
+- Standardized the kit's ESM-9110 pad on **XInput mode** (8 axes / 11 buttons,
+  standard xpad layout). The pad is multi-mode and also enumerates as a Nintendo
+  Switch Pro Controller (6 axes / 14 buttons) with off-center sticks and
+  non-standard triggers; XInput mode rests sticks at 0 and triggers at +1, so the
+  flight math and the student trigger/stick conversions are correct without extra
+  calibration. The mapping records the expected report shape (`report:` block);
+  the mux and student library now **reject a wrong-mode controller** (report-shape
+  mismatch) with a one-time warning instead of mis-reading it or crashing.
+- Added `scripts/setup_controller.sh` plus
+  `scripts/modprobe.d/blacklist-hid-nintendo.conf` to blacklist `hid_nintendo`.
+  On Pi 5 / kernel 6.x that driver otherwise claims the pad's Switch-Pro-spoof
+  USB id (`057e:2009`) at boot and forces the wrong 6-axis mode; blacklisted, the
+  pad falls back to `xpad` and comes up in XInput on every boot.
+
+### v1.0.0 - initial release
 
 - Full sensor + flight stack working with two-pilot operation
 - EdgeTPU inference auto-starts at boot
@@ -760,6 +779,60 @@ The mux node arbitrates between manual (Xbox sticks) and autonomous (student cod
 | Left stick X | Yaw (rotation) |
 | Right stick Y | Pitch (forward/back) |
 | Right stick X | Roll (left/right) |
+
+**Controller index mapping** (`config/xbox_mapping.yaml`):
+
+The button/axis to `/joy` array index mapping lives in one shared file read by
+both the mux node and the student library, so a different controller can be
+re-mapped without touching code. The kit standardizes on the ESM-9110 in
+**XInput mode** (standard xpad layout, `8 axes / 11 buttons`):
+
+| Control | `/joy` index | | Control | `/joy` index |
+|---|---|---|---|---|
+| A / B buttons | buttons 0 / 1 | | Back / Start | buttons 6 / 7 |
+| X / Y buttons | buttons 2 / 3 | | LB / RB | buttons 4 / 5 |
+| Left / right stick click | buttons 9 / 10 | | Guide | button 8 |
+| Left stick X / Y | axes 0 / 1 | | Left / right trigger (analog) | axes 2 / 5 |
+| Right stick X / Y | axes 3 / 4 | | D-pad X / Y | axes 6 / 7 |
+
+The `report:` block (`11` buttons / `8` axes) records the expected shape; a
+controller in a different mode is rejected rather than mis-read. To re-map, run
+`ros2 topic echo /joy`, press each control to read its index, edit
+`xbox_mapping.yaml`, then `colcon build` and restart the mux. A missing or
+partial file falls back to the built-in defaults (the values above).
+
+**Controller mode:** the ESM-9110 is multi-mode; press and **hold the "MODE"
+button** to cycle modes. The mode is sticky (remembered across power cycles), so
+set it once per pad. Use **XInput** (top + bottom LEDs lit):
+
+| LED pattern | USB id | Enumerates as | Mode |
+|---|---|---|---|
+| **top + bottom** | `2f24:00b7` | "Generic X-Box pad" | **XInput (use this)** |
+| center two | `0079:181c` | "ESM GAMEPAD" | DirectInput (wrong) |
+| top + third | `2f24:00b6` | "ESM Controller" | ESM/other (wrong) |
+
+If the student library or mux logs a "wrong controller mode" warning, the pad is
+in one of the wrong modes; hold **MODE** until the **top + bottom** LEDs are
+lit. Confirm with `lsusb | grep 2f24:00b7` or `ros2 topic echo /joy --once`
+(should show 11 buttons / 8 axes).
+
+**Boot-time fix (`hid_nintendo` blacklist):** the ESM-9110 also spoofs the
+Nintendo Switch Pro VID:PID `057e:2009`. On Pi 5 / kernel 6.x the `hid_nintendo`
+driver claims that spoof at enumeration and presents the wrong 6-axis / 14-button
+Switch profile (no `js0`); this is the intermittent "1 LED at boot" symptom.
+`scripts/setup_controller.sh` installs
+`scripts/modprobe.d/blacklist-hid-nintendo.conf`, which blacklists `hid_nintendo`
+so the pad falls back to the `xpad` driver and comes up in XInput mode
+automatically on every boot, independent of the pad's remembered MODE state:
+
+```bash
+./scripts/setup_controller.sh
+# then replug the controller or reboot
+```
+
+This is the fix to rely on for classroom use; the MODE button and the software
+wrong-mode guard remain as fallbacks. (Tradeoff: a genuine Switch Pro controller
+would also be blocked; the kit never uses one.)
 
 **Configuration** (`config/mux.yaml`):
 
