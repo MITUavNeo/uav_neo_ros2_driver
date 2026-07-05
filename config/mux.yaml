@@ -2,10 +2,10 @@
 #
 # The mux node arbitrates between manual (Xbox sticks) and auto (student
 # code) velocity commands based on the Xbox controller's bumper state:
-#   - LB held:  manual mode — Xbox sticks control the drone
-#   - RB held:  auto mode   — student code controls the drone
-#   - Neither:  idle        — zero velocity (hover)
-#   - Both:     idle        — zero velocity (hover)
+#   - LB held:  manual mode - Xbox sticks control the drone
+#   - RB held:  auto mode   - student code controls the drone
+#   - Neither:  idle        - zero velocity (hover)
+#   - Both:     idle        - zero velocity (hover)
 #
 # If the Xbox controller disconnects (no /joy message for >500ms),
 # the mux publishes zero velocity regardless of the last bumper state.
@@ -14,7 +14,7 @@
 # at the PX4 level by switching out of OFFBOARD mode.
 #
 # Input topics:  /joy (Xbox controller), /mux/cmd_vel (student code)
-# Output topic:  /mavros/setpoint_velocity/cmd_vel (to MAVROS → Pixhawk)
+# Output topic:  /mavros/setpoint_velocity/cmd_vel (to MAVROS -> Pixhawk)
 
 mux_node:
   ros__parameters:

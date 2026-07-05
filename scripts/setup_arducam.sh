@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_arducam.sh — Install Arducam B0578 global shutter camera driver (gscam + GStreamer)
+# setup_arducam.sh - Install Arducam B0578 global shutter camera driver (gscam + GStreamer)
 #
 # This script:
 #   1. Installs GStreamer tools and plugins

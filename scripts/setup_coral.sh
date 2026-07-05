@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_coral.sh — Install Coral EdgeTPU USB Accelerator dependencies
+# setup_coral.sh - Install Coral EdgeTPU USB Accelerator dependencies
 #
 # This script:
 #   1. Installs libedgetpu runtime (.deb from depend/)

@@ -4,7 +4,7 @@
 # pipeline state. Writes a report next to the offending log.
 #
 # Usage: ./gscam_crash_capture.sh
-# Stops after first hit (the failure mode is one-shot — gscam exits on detection).
+# Stops after first hit (the failure mode is one-shot - gscam exits on detection).
 
 set -u
 
@@ -20,7 +20,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
     sleep 1
 done
 if [ -z "$GSCAM_LOG" ]; then
-    echo "[capture] no gscam log appeared within 60s — aborting"
+    echo "[capture] no gscam log appeared within 60s - aborting"
     exit 1
 fi
 echo "[capture] tailing $GSCAM_LOG"
@@ -34,7 +34,7 @@ tail -F -n 0 "$GSCAM_LOG" 2>/dev/null | while read -r line; do
             T=$(date '+%Y-%m-%d %H:%M:%S')
             echo "[capture] HIT at $T: $line"
             {
-                echo "===== gscam crash report — $T ====="
+                echo "===== gscam crash report - $T ====="
                 echo
                 echo "Trigger line: $line"
                 echo
@@ -67,7 +67,7 @@ tail -F -n 0 "$GSCAM_LOG" 2>/dev/null | while read -r line; do
                 v4l2-ctl --list-devices 2>&1 | head -40
                 echo
                 echo "===== gscam process state ====="
-                pgrep -af gscam_node 2>&1 | grep -v grep || echo "(no gscam_node running — already exited)"
+                pgrep -af gscam_node 2>&1 | grep -v grep || echo "(no gscam_node running - already exited)"
                 echo
                 echo "===== teleop.log tail ====="
                 tail -30 "$LATEST_DIR/teleop.log" 2>/dev/null | grep -iE "gscam|arducam|usb|v4l"

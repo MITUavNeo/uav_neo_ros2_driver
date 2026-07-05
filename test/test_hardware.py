@@ -1,7 +1,7 @@
 """Hardware connectivity tests for UAV Neo sensors.
 
 Verifies that all peripherals are physically connected, detected by the OS,
-and accessible to the current user. These tests do NOT launch ROS2 nodes —
+and accessible to the current user. These tests do NOT launch ROS2 nodes -
 they check the prerequisites that the driver layer depends on.
 
 Run with:
@@ -404,7 +404,7 @@ class TestCoralTPU:
 
         assert output.shape[-1] == 1001, (
             f'Expected 1001-class output, got shape {output.shape}. '
-            'The EdgeTPU model may be corrupt — re-download the test model.'
+            'The EdgeTPU model may be corrupt - re-download the test model.'
         )
         assert output.sum() > 0, (
             'Inference output is all zeros. '
@@ -441,13 +441,13 @@ class TestCoralTPU:
         # EfficientDet-Lite0: 320x320 RGB input
         assert list(input_details[0]['shape']) == [1, 320, 320, 3], (
             f'Unexpected input shape {input_details[0]["shape"]}. '
-            'The EfficientDet-Lite0 model may be corrupt — re-download it.'
+            'The EfficientDet-Lite0 model may be corrupt - re-download it.'
         )
 
         # 4 outputs: boxes, class IDs, scores, detection count
         assert len(output_details) == 4, (
             f'Expected 4 detection outputs, got {len(output_details)}. '
-            'The EfficientDet-Lite0 model may be corrupt — re-download it.'
+            'The EfficientDet-Lite0 model may be corrupt - re-download it.'
         )
 
         input_data = np.random.randint(
@@ -465,7 +465,7 @@ class TestCoralTPU:
         interpreter.invoke()
         elapsed_ms = (time.monotonic() - start) * 1000
 
-        # Verify outputs are retrievable — output order varies by model export,
+        # Verify outputs are retrievable - output order varies by model export,
         # so identify by shape rather than index.
         output_shapes = [
             tuple(interpreter.get_tensor(od['index']).shape)

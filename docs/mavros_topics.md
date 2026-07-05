@@ -1,4 +1,4 @@
-# MAVROS Topic Reference — UAV Neo
+# MAVROS Topic Reference - UAV Neo
 
 Reference of notable MAVROS published topics, subscribers, and services for the UAV Neo platform.
 
@@ -59,21 +59,21 @@ Rates measured on UAV Neo hardware (Pixhawk 2.8.4 over UART at 921600 baud).
 | `/mavros/imu/data_raw` | `sensor_msgs/msg/Imu` | 50 Hz | Raw IMU data without orientation estimate |
 | `/mavros/imu/mag` | `sensor_msgs/msg/MagneticField` | 13 Hz | Magnetometer reading (x, y, z) |
 | `/mavros/imu/temperature_imu` | `sensor_msgs/msg/Temperature` | 18 Hz | IMU sensor temperature |
-| `/mavros/imu/temperature_baro` | `sensor_msgs/msg/Temperature` | — | Barometer sensor temperature (not active on this hardware) |
+| `/mavros/imu/temperature_baro` | `sensor_msgs/msg/Temperature` | - | Barometer sensor temperature (not active on this hardware) |
 | `/mavros/imu/static_pressure` | `sensor_msgs/msg/FluidPressure` | 18 Hz | Barometric pressure (absolute) |
-| `/mavros/imu/diff_pressure` | `sensor_msgs/msg/FluidPressure` | — | Differential pressure (no airspeed sensor installed) |
+| `/mavros/imu/diff_pressure` | `sensor_msgs/msg/FluidPressure` | - | Differential pressure (no airspeed sensor installed) |
 
 ### Local Position and Velocity
 
 | Topic | Message Type | Rate | Description |
 |---|---|---|---|
 | `/mavros/local_position/pose` | `geometry_msgs/msg/PoseStamped` | 30 Hz | Local position (x, y, z) and orientation in NED frame |
-| `/mavros/local_position/pose_cov` | `geometry_msgs/msg/PoseWithCovarianceStamped` | — | Local position with covariance (requires EKF covariance output) |
+| `/mavros/local_position/pose_cov` | `geometry_msgs/msg/PoseWithCovarianceStamped` | - | Local position with covariance (requires EKF covariance output) |
 | `/mavros/local_position/velocity_local` | `geometry_msgs/msg/TwistStamped` | 30 Hz | Velocity in local NED frame |
 | `/mavros/local_position/velocity_body` | `geometry_msgs/msg/TwistStamped` | 30 Hz | Velocity in body frame |
-| `/mavros/local_position/velocity_body_cov` | `geometry_msgs/msg/TwistWithCovarianceStamped` | — | Body velocity with covariance (requires EKF covariance output) |
+| `/mavros/local_position/velocity_body_cov` | `geometry_msgs/msg/TwistWithCovarianceStamped` | - | Body velocity with covariance (requires EKF covariance output) |
 | `/mavros/local_position/odom` | `nav_msgs/msg/Odometry` | 30 Hz | Full odometry (pose + twist) in local frame |
-| `/mavros/local_position/accel` | `geometry_msgs/msg/AccelWithCovarianceStamped` | — | Local acceleration estimate (not published in current PX4 config) |
+| `/mavros/local_position/accel` | `geometry_msgs/msg/AccelWithCovarianceStamped` | - | Local acceleration estimate (not published in current PX4 config) |
 
 ### Altitude
 
@@ -91,9 +91,9 @@ Rates measured on UAV Neo hardware (Pixhawk 2.8.4 over UART at 921600 baud).
 
 | Topic | Message Type | Rate | Description |
 |---|---|---|---|
-| `/mavros/rc/in` | `mavros_msgs/msg/RCIn` | 4 Hz | RC controller input — all channel PWM values (1000–2000 us) and RSSI |
+| `/mavros/rc/in` | `mavros_msgs/msg/RCIn` | 4 Hz | RC controller input - all channel PWM values (1000-2000 us) and RSSI |
 | `/mavros/rc/out` | `mavros_msgs/msg/RCOut` | 10 Hz | Servo/motor output PWM values for all channels |
-| `/mavros/manual_control/control` | `mavros_msgs/msg/ManualControl` | — | Normalized joystick inputs (requires `MAV_1_MODE` set to `Normal`) |
+| `/mavros/manual_control/control` | `mavros_msgs/msg/ManualControl` | - | Normalized joystick inputs (requires `MAV_1_MODE` set to `Normal`) |
 
 ### Flight Display (HUD)
 
@@ -149,7 +149,7 @@ These topics accept commands from your ROS2 nodes and send them to the Pixhawk.
 | Topic | Message Type | Description |
 |---|---|---|
 | `/mavros/setpoint_attitude/cmd_vel` | `geometry_msgs/msg/TwistStamped` | Command angular velocity (body rates) |
-| `/mavros/setpoint_attitude/thrust` | `mavros_msgs/msg/Thrust` | Command thrust (0.0–1.0 normalized for PX4) |
+| `/mavros/setpoint_attitude/thrust` | `mavros_msgs/msg/Thrust` | Command thrust (0.0-1.0 normalized for PX4) |
 
 ### Setpoint Raw
 

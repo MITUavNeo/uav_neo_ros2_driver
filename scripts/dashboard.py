@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""UAV Neo web dashboard — real-time ROS2 node and topic monitor.
+"""UAV Neo web dashboard - real-time ROS2 node and topic monitor.
 
 Serves a single-page dashboard on port 8080 that displays node health,
 topic publish rates, and watchdog restart events.  Uses only Python
-stdlib (http.server, json, subprocess) — no external dependencies.
+stdlib (http.server, json, subprocess) - no external dependencies.
 
 Designed to run as a systemd service (uav-dashboard.service).
 """
@@ -283,7 +283,7 @@ function update() {
       // Rates
       let rh = '';
       for (const [topic, info] of Object.entries(data.rates)) {
-        const hz = info.hz !== null ? info.hz.toFixed(1) + ' Hz' : '—';
+        const hz = info.hz !== null ? info.hz.toFixed(1) + ' Hz' : '-';
         const cls = info.hz === null ? 'dead' : (info.stale ? 'stale' : 'ok');
         const label = info.hz === null ? 'NO DATA' : (info.stale ? 'STALE' : 'OK');
         rh += `<tr><td>${topic}</td><td class="hz ${cls}">${hz}</td><td class="hz ${cls}">${label}</td></tr>`;

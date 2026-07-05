@@ -1,5 +1,5 @@
 #!/bin/bash
-# patch_gscam.sh — Clone, patch, and build gscam with appsink memory-leak fix
+# patch_gscam.sh - Clone, patch, and build gscam with appsink memory-leak fix
 #
 # The stock ros-jazzy-gscam package has an unbounded appsink buffer that
 # causes memory leaks under CPU load (ros-drivers/gscam#63).  This script
@@ -67,7 +67,7 @@ else
     if grep -q "gst_app_sink_set_max_buffers" "$GSCAM_CPP"; then
         echo "Patch applied successfully."
     else
-        echo "ERROR: Patch failed — gst_app_sink_set_max_buffers not found in $GSCAM_CPP"
+        echo "ERROR: Patch failed - gst_app_sink_set_max_buffers not found in $GSCAM_CPP"
         exit 1
     fi
 fi

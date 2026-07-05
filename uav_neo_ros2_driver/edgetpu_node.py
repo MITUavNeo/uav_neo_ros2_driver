@@ -84,7 +84,7 @@ class EdgeTPUNode(Node):
         )
 
         # First load_delegate after boot triggers the Coral firmware load
-        # (1a6e:089a → 18d1:9302) but always fails. Retry once.
+        # (1a6e:089a -> 18d1:9302) but always fails. Retry once.
         try:
             self.interpreter = make_interpreter(model_path)
         except ValueError:
@@ -249,7 +249,7 @@ class EdgeTPUNode(Node):
             hyp.hypothesis.score = float(scores[i])
             det.results.append(hyp)
 
-            # Bounding box — model outputs normalized [ymin, xmin, ymax, xmax]
+            # Bounding box - model outputs normalized [ymin, xmin, ymax, xmax]
             ymin, xmin, ymax, xmax = boxes[i]
             cx = float((xmin + xmax) / 2.0 * img_w)
             cy = float((ymin + ymax) / 2.0 * img_h)

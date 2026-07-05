@@ -1,4 +1,4 @@
-# RealSense D435i Topic Reference — UAV Neo
+# RealSense D435i Topic Reference - UAV Neo
 
 Reference of ROS2 topics published by the Intel RealSense D435i using `realsense2_camera`.
 
@@ -77,7 +77,7 @@ Rates measured on UAV Neo hardware (Raspberry Pi 5, depth + color + IMU enabled 
 |---|---|---|---|
 | `/camera/depth/color/points` | `sensor_msgs/msg/PointCloud2` | Up to 30 Hz | Colored 3D point cloud (XYZRGB) |
 
-> **Disabled by default** in the UAV Neo config — point cloud generation is CPU intensive on the Pi 5. Enable with: `ros2 launch uav_neo_ros2_driver realsense.launch.py pointcloud_enable:=true`
+> **Disabled by default** in the UAV Neo config - point cloud generation is CPU intensive on the Pi 5. Enable with: `ros2 launch uav_neo_ros2_driver realsense.launch.py pointcloud_enable:=true`
 
 ## Camera Info and Metadata
 
@@ -124,7 +124,7 @@ The default UAV Neo config runs at 640x480 @ 15 FPS for depth and color streams.
 | Resolution | Max FPS (Depth) | Max FPS (Color) | Notes |
 |---|---|---|---|
 | 1280x720 | 30 | 30 | Higher quality, more CPU load |
-| 640x480 | 90 | 60 | Default — good balance for Pi 5 |
+| 640x480 | 90 | 60 | Default - good balance for Pi 5 |
 | 424x240 | 90 | 60 | Lowest latency |
 
 To change resolution, pass launch arguments:
@@ -158,7 +158,7 @@ Disabling filters will increase the depth framerate on the Pi 5 (~19 Hz with fil
 
 ## Known Issues
 
-### IMU "Motion Module force pause" (Firmware < 5.17.0.9) — RESOLVED
+### IMU "Motion Module force pause" (Firmware < 5.17.0.9) - RESOLVED
 
 The D435i IMU fails to publish data with `Hardware Notification: Motion Module force pause` on firmware 5.17.0.9 with the Pi 5's xHCI USB host controller.
 

@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "============================================="
-echo "  UAV Neo — Service Setup"
+echo "  UAV Neo - Service Setup"
 echo "============================================="
 
 # ---------------------------------------------------------------------------
@@ -165,10 +165,10 @@ echo "  Service setup complete!"
 echo "============================================="
 echo ""
 echo "Services installed and enabled for next boot:"
-echo "  uav-teleop     — Teleop autostart (MAVROS + RealSense + Arducam)"
-echo "  uav-watchdog   — Node health monitor and auto-restart"
-echo "  uav-dashboard  — Web dashboard at http://<pi-ip>:8080"
-echo "  uav-jupyter    — JupyterLab at http://<pi-ip>:8888"
+echo "  uav-teleop     - Teleop autostart (MAVROS + RealSense + Arducam)"
+echo "  uav-watchdog   - Node health monitor and auto-restart"
+echo "  uav-dashboard  - Web dashboard at http://<pi-ip>:8080"
+echo "  uav-jupyter    - JupyterLab at http://<pi-ip>:8888"
 echo ""
 echo "Start now (without reboot):"
 echo "  sudo systemctl start uav-teleop"

@@ -1,4 +1,4 @@
-# PX4 Tuning Guide — UAV Neo (F450 Quadcopter)
+# PX4 Tuning Guide - UAV Neo (F450 Quadcopter)
 
 Guide for tuning the UAV Neo F450 frame quadcopter running PX4 on a Pixhawk 2.8.4. All parameter changes are made in QGroundControl (Vehicle Setup > Parameters).
 
@@ -61,7 +61,7 @@ In QGroundControl: **Sensors > Level Horizon**
 In QGroundControl: **Sensors > Gyroscope**
 
 - Place the drone on a stable surface and do not touch it
-- Takes a few seconds — sets the zero-rate reference
+- Takes a few seconds - sets the zero-rate reference
 
 ### Compass Calibration
 
@@ -79,10 +79,10 @@ In QGroundControl: **Sensors > Compass**
 
 The CG must be at the geometric center of the F450 frame (where the motor axes cross). With the UAV Neo payload:
 
-- **Raspberry Pi 5** — mount centrally on the top or bottom plate
-- **Intel RealSense D435i** — mount forward-facing, as close to center as practical
-- **Coral EdgeTPU** — lightweight, mount wherever convenient
-- **Battery** — use battery position as the primary CG adjustment. Slide it forward/back until the drone balances level when lifted from the center
+- **Raspberry Pi 5**: mount centrally on the top or bottom plate
+- **Intel RealSense D435i**: mount forward-facing, as close to center as practical
+- **Coral EdgeTPU**: lightweight, mount wherever convenient
+- **Battery**: use battery position as the primary CG adjustment. Slide it forward/back until the drone balances level when lifted from the center
 
 If CG is off-center, one or two motors will work harder to compensate, reducing flight time and causing asymmetric handling.
 
@@ -111,14 +111,14 @@ Verify motor order matches PX4 airframe configuration. In QGroundControl: **Airf
 
 ## 3. Motor and ESC Verification
 
-### Check Motor Spin Direction
+### Motor Spin Direction Check
 
 In QGroundControl: **Motors** tab (with props removed!)
 
 - Spin each motor individually and verify correct CW/CCW direction
 - Swap any two of the three ESC-to-motor wires to reverse a motor
 
-### Check Motor Balance
+### Motor Balance Check
 
 Monitor motor outputs during a hover using MAVROS:
 
@@ -143,7 +143,7 @@ Tune and test in this order, each mode builds on the previous:
 
 | Order | Mode | What It Tests | Requirements |
 |---|---|---|---|
-| 1 | **Manual/Acro** | Raw motor response | Experience required — skip if not comfortable |
+| 1 | **Manual/Acro** | Raw motor response | Experience required - skip if not comfortable |
 | 2 | **Stabilized** | Attitude hold (roll/pitch/yaw) | Accelerometer + Level Horizon calibration |
 | 3 | **Altitude** | Throttle hold + attitude | Barometer calibration |
 | 4 | **Position** | Full position hold | Requires position estimation (e.g., VIO from RealSense) |
@@ -192,7 +192,7 @@ Controls how aggressively the drone corrects angle errors. Tune after rate gains
 
 - **Too low:** drone is slow to level out, feels mushy
 - **Too high:** drone overshoots target angle, oscillates
-- Default 6.5 is usually fine for F450 — only adjust if rate gains are already tuned and response is still poor
+- Default 6.5 is usually fine for F450 - only adjust if rate gains are already tuned and response is still poor
 
 ### Autotune
 
@@ -253,14 +253,14 @@ Monitor these topics during tuning flights to diagnose issues:
 | Topic | What to Look For |
 |---|---|
 | `/mavros/imu/data` | Orientation stability, angular rates during hover |
-| `/mavros/rc/out` | Motor PWM balance — all 4 should be similar in hover |
+| `/mavros/rc/out` | Motor PWM balance - all 4 should be similar in hover |
 | `/mavros/local_position/pose` | Position drift rate |
 | `/mavros/vfr_hud` | Groundspeed (should be near 0 in hover), climb rate |
-| `/mavros/estimator_status` | EKF health flags — all should be healthy |
+| `/mavros/estimator_status` | EKF health flags - all should be healthy |
 | `/mavros/rc/in` | Verify stick inputs are reaching the FCU correctly |
 | `/mavros/state` | Confirm armed state and flight mode |
 
-Example — record motor outputs during a hover for analysis:
+Example - record motor outputs during a hover for analysis:
 
 ```bash
 ros2 topic echo /mavros/rc/out --csv > motor_log.csv

@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_networking.sh — Configure eth0 dual-IP and wlan0 isolated AP
+# setup_networking.sh - Configure eth0 dual-IP and wlan0 isolated AP
 #
 # This script:
 #   1. Installs the NetworkManager dispatcher that blocks FORWARD on wlan0
@@ -12,7 +12,7 @@
 #      192.168.52.200/24 address and a DHCP-assigned address simultaneously
 #   5. Runs `netplan apply` to bring the new config up
 #
-# All steps are idempotent — re-running this script is safe.
+# All steps are idempotent - re-running this script is safe.
 
 set -e
 
@@ -36,7 +36,7 @@ CHANGES_MADE=false
 echo "[1/4] Installing AP isolation dispatcher at $DISPATCHER_PATH..."
 sudo tee "$DISPATCHER_PATH" >/dev/null <<'SCRIPT'
 #!/bin/sh
-# UAV Neo hotspot isolation — NM's ipv4.method=shared enables IP forwarding
+# UAV Neo hotspot isolation - NM's ipv4.method=shared enables IP forwarding
 # and sets up NAT, which would let wlan0 AP clients route out through eth0.
 # Block FORWARD in/out of wlan0 so clients can reach the Pi's own services
 # (Jupyter, dashboard, SSH) but cannot use the Pi as an internet gateway.
@@ -86,7 +86,7 @@ fi
 # --- 3. Create or update the AP connection -----------------------------------
 echo "[3/4] Configuring AP connection '$AP_CON_NAME'..."
 if nmcli -t -f NAME con show | grep -qx "$AP_CON_NAME"; then
-    echo "  Connection already exists — reapplying settings."
+    echo "  Connection already exists - reapplying settings."
     sudo nmcli connection modify "$AP_CON_NAME" \
         802-11-wireless.ssid "$AP_SSID" \
         802-11-wireless.mode ap \
@@ -159,5 +159,5 @@ echo "  iw dev wlan0 info               # ssid uav-neo-0, type AP, ch 6"
 echo "  sudo iptables -L FORWARD -n     # two REJECT rules for wlan0"
 if [ "$CHANGES_MADE" = "false" ]; then
     echo
-    echo "(No configuration changes were necessary — system already matched.)"
+    echo "(No configuration changes were necessary - system already matched.)"
 fi

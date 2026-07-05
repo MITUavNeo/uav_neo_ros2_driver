@@ -1,12 +1,12 @@
 """Launch MAVROS, RealSense D435i, and Arducam together for UAV Neo teleop.
 
 Adds topic relays so the student library can use simplified names:
-    /camera/forward  ← /camera/color/image_raw
-    /camera/depth    ← /camera/depth/image_rect_raw
-    /camera/nadir    ← /arducam/camera/image_raw
-    /imu             ← fused by student library (RealSense + MAVROS)
-    /nav             ← /mavros/global_position/global
-    /velocity        ← /mavros/local_position/velocity_body
+    /camera/forward  <- /camera/color/image_raw
+    /camera/depth    <- /camera/depth/image_rect_raw
+    /camera/nadir    <- /arducam/camera/image_raw
+    /imu             <- fused by student library (RealSense + MAVROS)
+    /nav             <- /mavros/global_position/global
+    /velocity        <- /mavros/local_position/velocity_body
 """
 
 from launch import LaunchDescription
@@ -106,7 +106,7 @@ def generate_launch_description():
         description='Path to EdgeTPU config YAML')
 
     # Include EdgeTPU launch (delayed 10s to let Coral USB firmware enumeration
-    # and udev settle after boot — load_delegate fails if it runs too early).
+    # and udev settle after boot - load_delegate fails if it runs too early).
     edgetpu_launch = TimerAction(
         period=10.0,
         actions=[
