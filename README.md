@@ -1,6 +1,6 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.1.0**
+**Version: v1.2.0**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
@@ -17,6 +17,13 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - **Setup automation**: `setup_all.sh` runs six phases (ROS2 -> Pixhawk/MAVROS -> RealSense -> Arducam + gscam patch + Coral -> services -> networking) idempotently.
 
 ## Release notes
+
+### v1.2.0 (2026-07-05)
+
+- Added a `gamepad_node` that normalizes the Xbox controller (`/joy`) into `/gamepad/cmd_vel`, so the drone can be flown manually (LB held) with no student-library code. The mux now consumes that topic for manual mode and keeps the LB/RB gating and speed limits.
+- RealSense color and depth are rotated 180 degrees in the relay to correct the upside-down camera mount (toggle with `realsense_flip`); the downward Arducam is unaffected.
+- Repo-wide syntax pass: all prose and code is ASCII (no em-dashes), README headings are noun-phrase and sentence case, and the table of contents anchors are verified.
+- Lint: `ament_flake8`, `ament_pep257`, and `ament_copyright` tests pass. Added GPLv3 license headers, a `LICENSE` file, and `CONTRIBUTING.md`; set the package license to `GPL-3.0-or-later`.
 
 ### v1.1.0 (2026-07-05)
 

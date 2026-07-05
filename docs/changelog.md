@@ -4,6 +4,33 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-05
+
+### Added
+
+- `gamepad_node` (`uav_neo_ros2_driver/gamepad.py`): normalizes `/joy` into
+  `/gamepad/cmd_vel` so the drone can be flown manually without student code.
+- `config/gamepad.yaml` for the gamepad node's dead zone.
+- 180-degree rotation of the RealSense color and depth relays for the
+  upside-down camera mount, toggled by the `realsense_flip` launch argument.
+- GPLv3 license headers on all source files, a `LICENSE` file, and
+  `CONTRIBUTING.md`.
+
+### Changed
+
+- `mux_node` consumes `/gamepad/cmd_vel` for manual mode instead of reading the
+  `/joy` sticks directly; stick normalization moved to the gamepad node. A stale
+  manual or auto command now holds zero velocity.
+- Repo-wide ASCII syntax pass; README headings are noun-phrase and sentence case.
+- Package license set to `GPL-3.0-or-later` in `package.xml` and `setup.py`.
+
+### Fixed
+
+- `ament_flake8`, `ament_pep257`, and `ament_copyright` tests now pass (import
+  ordering, quotes, line length, docstring conventions, license headers).
+- `dashboard.py` shutdown handler now declares `global _monitor_running`, so it
+  actually stops the monitor loop instead of binding a dead local.
+
 ## [1.1.0] - 2026-07-05
 
 ### Added
