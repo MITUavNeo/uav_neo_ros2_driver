@@ -28,7 +28,7 @@ setup(
     maintainer='uav',
     maintainer_email='uav@todo.todo',
     description='ROS2 driver for UAV Neo',
-    license='TODO: License declaration',
+    license='GPL-3.0-or-later',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
