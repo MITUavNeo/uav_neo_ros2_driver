@@ -7,25 +7,24 @@ and publishes Detection2DArray results to /edgetpu/inference.
 import os
 import time
 
+from ament_index_python.packages import get_package_share_directory
+from cv_bridge import CvBridge
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 import numpy as np
 from pycoral.utils.edgetpu import list_edge_tpus, make_interpreter
-
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from ament_index_python.packages import get_package_share_directory
-from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from vision_msgs.msg import (
     BoundingBox2D,
     Detection2D,
     Detection2DArray,
-    ObjectHypothesisWithPose,
     ObjectHypothesis,
-    Pose2D,
+    ObjectHypothesisWithPose,
     Point2D,
+    Pose2D,
 )
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
 
 class EdgeTPUNode(Node):

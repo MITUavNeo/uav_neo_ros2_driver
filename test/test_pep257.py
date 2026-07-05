@@ -19,5 +19,9 @@ import pytest
 @pytest.mark.linter
 @pytest.mark.pep257
 def test_pep257():
-    rc = main(argv=['.', 'test'])
+    # The package uses Google-style docstrings with a first-line summary, which
+    # conflicts with pydocstyle's default pep257 convention. Ignore those
+    # convention-only codes: D213 (summary on the second line) and D406/D407/D413
+    # (Google-style section formatting).
+    rc = main(argv=['.', 'test', '--add-ignore', 'D213', 'D406', 'D407', 'D413'])
     assert rc == 0, 'Found code style errors / warnings'

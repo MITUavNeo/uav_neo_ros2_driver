@@ -314,7 +314,7 @@ class TestCoralTPU:
         )
 
     def test_libedgetpu_installed(self):
-        """libedgetpu runtime library must be installed."""
+        """The libedgetpu runtime library must be installed."""
         result = subprocess.run(
             ['dpkg', '-l', 'libedgetpu1-std'],
             capture_output=True, text=True, timeout=5,
@@ -337,7 +337,7 @@ class TestCoralTPU:
             )
 
     def test_pycoral_importable(self):
-        """pycoral Python package must be importable."""
+        """Coral Python package (pycoral) must be importable."""
         try:
             importlib.import_module('pycoral.utils.edgetpu')
         except ImportError:
@@ -348,7 +348,7 @@ class TestCoralTPU:
             )
 
     def test_edgetpu_runtime_detects_tpu(self):
-        """pycoral must be able to see the EdgeTPU via libedgetpu."""
+        """The EdgeTPU must be visible to pycoral via libedgetpu."""
         try:
             from pycoral.utils.edgetpu import list_edge_tpus
         except ImportError:

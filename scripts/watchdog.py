@@ -9,14 +9,14 @@ logged to ~/logs/latest/watchdog.log.
 Designed to run as a systemd service (uav-watchdog.service).
 """
 
+from datetime import datetime
 import logging
 import os
+from pathlib import Path
 import signal
 import subprocess
 import sys
 import time
-from datetime import datetime
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -86,7 +86,8 @@ NODES = {
     },
     'mux': {
         'topic': '/mavros/setpoint_velocity/cmd_vel',
-        'launch': 'mux.launch.py',  # standalone - using teleop.launch.py would re-spawn the whole stack
+        # standalone; using teleop.launch.py would re-spawn the whole stack
+        'launch': 'mux.launch.py',
         'device_check': lambda: True,  # software node, always "connected"
         'device_label': 'mux_node (software)',
         'kill_pattern': 'mux_node',
@@ -109,7 +110,7 @@ log = logging.getLogger('watchdog')
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _find_rpi_volt_alarm() -> "Path | None":
+def _find_rpi_volt_alarm() -> 'Path | None':
     """Locate the Pi 5 PMIC low-voltage sticky alarm flag.
 
     hwmon enumeration order is not stable, so resolve by the driver's `name`
@@ -233,7 +234,8 @@ def _restart_node(name: str, cfg: dict) -> None:
                 log.info('%s: sent SIGTERM to processes matching "%s"', name, kill_pat)
                 time.sleep(2)
                 # Force-kill any survivors
-                r2 = subprocess.run(['pkill', '-9', '-f', kill_pat], capture_output=True, timeout=5)
+                r2 = subprocess.run(['pkill', '-9', '-f', kill_pat],
+                                    capture_output=True, timeout=5)
                 if r2.returncode == 0:
                     log.info('%s: sent SIGKILL to surviving processes', name)
                 time.sleep(1)

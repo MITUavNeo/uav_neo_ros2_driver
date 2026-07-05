@@ -38,11 +38,11 @@ def generate_launch_description():
     # appsink max-buffers=1 drop=true.
     gscam_config = PythonExpression([
         "'v4l2src device=", LaunchConfiguration('video_device'),
-        " ! image/jpeg,width=", LaunchConfiguration('image_width'),
-        ",height=", LaunchConfiguration('image_height'),
-        ",framerate=", LaunchConfiguration('framerate'),
-        "/1 ! jpegdec ! videoconvert"
-        " ! queue max-size-buffers=2 leaky=downstream"
+        ' ! image/jpeg,width=', LaunchConfiguration('image_width'),
+        ',height=', LaunchConfiguration('image_height'),
+        ',framerate=', LaunchConfiguration('framerate'),
+        '/1 ! jpegdec ! videoconvert'
+        ' ! queue max-size-buffers=2 leaky=downstream'
         " ! videorate ! video/x-raw,framerate=20/1'"
     ])
 
