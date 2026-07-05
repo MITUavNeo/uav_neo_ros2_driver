@@ -9,15 +9,16 @@ Adds topic relays so the student library can use simplified names:
     /velocity        <- /mavros/local_position/velocity_body
 """
 
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, \
-    TimerAction, ExecuteProcess
-from launch.conditions import LaunchConfigurationEquals, LaunchConfigurationNotEquals
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, \
+    IncludeLaunchDescription, TimerAction
+from launch.conditions import LaunchConfigurationEquals
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
-import os
 
 
 def generate_launch_description():
@@ -157,6 +158,16 @@ def generate_launch_description():
         }],
     )
 
+    # Gamepad: normalizes /joy sticks into /gamepad/cmd_vel for the mux, so a
+    # pilot can fly manually (LB held) without running student-library code.
+    gamepad_node = Node(
+        package='uav_neo_ros2_driver',
+        executable='gamepad_node',
+        name='gamepad_node',
+        output='log',
+        parameters=[os.path.join(pkg_dir, 'config', 'gamepad.yaml')],
+    )
+
     # Mux: launched via standalone mux.launch.py so the watchdog can
     # restart it without re-spawning the rest of the teleop stack.
     mux_launch = IncludeLaunchDescription(
@@ -180,13 +191,12 @@ def generate_launch_description():
         ('/camera/depth/image_rect_raw',  '/camera/depth',   True),
         ('/arducam/camera/image_raw',     '/camera/nadir',   False),
     ]
-    image_relays = [
-        ExecuteProcess(
-            cmd=['python3', image_relay, src, dst]
-                + ([LaunchConfiguration('realsense_flip')] if flip else []),
-            output='log')
-        for src, dst, flip in image_relay_specs
-    ]
+    image_relays = []
+    for src, dst, flip in image_relay_specs:
+        cmd = ['python3', image_relay, src, dst]
+        if flip:
+            cmd.append(LaunchConfiguration('realsense_flip'))
+        image_relays.append(ExecuteProcess(cmd=cmd, output='log'))
 
     # MAVROS topics are published RELIABLE, so topic_tools/relay works fine.
     topic_tools_relays = [
@@ -216,6 +226,7 @@ def generate_launch_description():
         realsense_flip_arg,
         mavros_launch,
         joy_node,
+        gamepad_node,
         mux_launch,
         realsense_launch,
         arducam_launch,

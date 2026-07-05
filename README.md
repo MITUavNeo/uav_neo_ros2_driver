@@ -78,6 +78,7 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
   - [Arducam B0578](#arducam-b0578)
   - [All sensors (teleop)](#all-sensors-teleop)
   - [Mux node](#mux-node)
+  - [Gamepad node](#gamepad-node)
   - [EdgeTPU inference](#edgetpu-inference)
 - [Services](#services)
   - [Teleop autostart](#teleop-autostart)
@@ -185,13 +186,17 @@ The driver publishes sensor data on standard ROS2 topic names. The teleop launch
 **Flight command flow:**
 
 ```
-Student code                Xbox controller
-     │                            │
- send_pcmd()                  joy_node
-     │                            │
- /mux/cmd_vel              /joy (buttons + axes)
-     │                            │
-     └──────────┬─────────────────┘
+Student code            Xbox controller
+     │                        │
+ send_pcmd()              joy_node
+     │                        │
+     │                      /joy ───────────┐ (buttons: LB/RB gating)
+     │                        │             │
+     │                   gamepad_node       │
+     │                        │             │
+ /mux/cmd_vel        /gamepad/cmd_vel       │
+     │                        │             │
+     └──────────┬─────────────┴─────────────┘
                 │
            mux_node (LB/RB gating + speed limit)
                 │
@@ -764,13 +769,18 @@ The launch also uses `image_relay.py` (a QoS-matched relay) for the three image 
 
 ### Mux node
 
-The mux node arbitrates between manual (Xbox sticks) and autonomous (student code) velocity commands. It is included automatically in the teleop launch.
+The mux node arbitrates between the manual gamepad command and the autonomous (student code) command. It is included automatically in the teleop launch. Both sources send a normalized `[-1, 1]` `TwistStamped`; the mux scales by `max_speed`/`max_yaw_rate` and forwards to MAVROS.
 
 **Behavior:**
-- **LB held**: manual mode: Xbox stick inputs are scaled by `max_speed` and forwarded to MAVROS
+- **LB held**: manual mode: the gamepad node's command (`/gamepad/cmd_vel`) is scaled and forwarded
 - **RB held**: auto mode: student code commands (from `/mux/cmd_vel`) are scaled and forwarded
 - **Neither bumper**: idle: zero velocity published (drone hovers)
 - **Controller disconnected**: if no `/joy` message for 500ms, zero velocity published
+- **Stale source**: a manual or auto command older than 500ms holds zero (e.g. a dead gamepad node)
+
+### Gamepad node
+
+The gamepad node (`gamepad_node`) reads the Xbox controller (`/joy`), normalizes the sticks to `[-1, 1]` (deadzone from `config/gamepad.yaml`), and publishes `/gamepad/cmd_vel` for the mux. This lets a pilot fly manually (LB held) without running any student-library code. It reads the stick axis indices from `config/xbox_mapping.yaml` and ignores frames from a wrong-mode controller. The mux owns the LB/RB gating and the speed limits; the gamepad node only normalizes.
 
 **Stick mapping (Mode 2):**
 

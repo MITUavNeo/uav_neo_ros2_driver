@@ -1,22 +1,23 @@
 """Velocity command mux for UAV Neo.
 
-Arbitrates between manual (Xbox controller) and auto (student code) velocity
+Arbitrates between manual (gamepad node) and auto (student code) velocity
 commands based on the Xbox controller's bumper state:
 
-    LB held  -> manual mode: Xbox sticks drive the drone
-    RB held  -> auto mode:   student code drives the drone
+    LB held  -> manual mode: /gamepad/cmd_vel drives the drone
+    RB held  -> auto mode:   /mux/cmd_vel (student code) drives the drone
     Neither  -> idle:        zero velocity (hover)
 
-Publishes the selected command to /mavros/setpoint_velocity/cmd_vel
-at a fixed rate. All commands are scaled by max_speed from config.
+Both sources send a normalized [-1, 1] TwistStamped; the mux scales by
+max_speed/max_yaw_rate and publishes to /mavros/setpoint_velocity/cmd_vel at a
+fixed rate. A source whose command is older than the timeout holds zero.
 
 If the Xbox controller disconnects (no /joy message for >500ms), the mux
 treats it as idle and publishes zero velocity regardless of the last
 bumper state.
 
-The button/axis -> /joy index mapping (LB, RB, and the four stick axes) is
-loaded from config/xbox_mapping.yaml so it can be re-mapped for a different
-controller without editing this file.
+Only the LB/RB button indices are read here, from config/xbox_mapping.yaml; the
+gamepad node reads the stick axes from the same file. Re-mapping a different
+controller is a YAML edit, no code change.
 
 The safety pilot on the RC transmitter always has override authority at the
 PX4 level by switching out of OFFBOARD mode.
@@ -24,10 +25,10 @@ PX4 level by switching out of OFFBOARD mode.
 
 import time
 
+from geometry_msgs.msg import TwistStamped
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
-from geometry_msgs.msg import TwistStamped
 
 from uav_neo_ros2_driver.controller_mapping import (
     default_mapping_path, load_mapping,
@@ -45,25 +46,20 @@ class MuxNode(Node):
         # Parameters
         self.declare_parameter('max_speed', 0.5)
         self.declare_parameter('max_yaw_rate', 0.5)
-        self.declare_parameter('joystick_dead_zone', 0.15)
         self.declare_parameter('publish_rate', 20.0)
         self.declare_parameter('mapping_config', default_mapping_path())
 
         self._max_speed = self.get_parameter('max_speed').value
         self._max_yaw_rate = self.get_parameter('max_yaw_rate').value
-        self._joy_dz = self.get_parameter('joystick_dead_zone').value
         publish_rate = self.get_parameter('publish_rate').value
 
-        # Controller button/axis -> /joy index mapping (shared config file)
+        # LB/RB gating uses the shared controller mapping. Manual stick values
+        # are normalized by the gamepad node (/gamepad/cmd_vel), not read here.
         mapping_path = self.get_parameter('mapping_config').value
         mapping = load_mapping(mapping_path)
-        btn, ax = mapping['buttons'], mapping['axes']
+        btn = mapping['buttons']
         self._LB = btn['lb']
         self._RB = btn['rb']
-        self._LEFT_X = ax['left_x']
-        self._LEFT_Y = ax['left_y']
-        self._RIGHT_X = ax['right_x']
-        self._RIGHT_Y = ax['right_y']
 
         # Expected /joy report shape for the standardized controller mode. A
         # frame that does not match is from a wrong-mode controller and is
@@ -74,16 +70,23 @@ class MuxNode(Node):
         self._exp_axes = report.get('axes')
         self._warned_mode = False
 
-        # Store latest raw Joy message and timestamp
+        # Latest inputs. _auto_cmd is the student autonomy command
+        # (/mux/cmd_vel); _gamepad_cmd is the manual command from the gamepad
+        # node (/gamepad/cmd_vel). Both are stored already scaled to m/s.
         self._latest_joy = None
         self._joy_stamp = 0.0
         self._auto_cmd = TwistStamped()
+        self._gamepad_cmd = TwistStamped()
+        self._gamepad_stamp = 0.0
         self._joy_connected = False
 
         # Subscribers
         self.create_subscription(Joy, '/joy', self._joy_cb, 10)
         self.create_subscription(
             TwistStamped, '/mux/cmd_vel', self._auto_cb, 10
+        )
+        self.create_subscription(
+            TwistStamped, '/gamepad/cmd_vel', self._gamepad_cb, 10
         )
 
         # Publisher
@@ -103,9 +106,8 @@ class MuxNode(Node):
             f'joy_timeout={self._JOY_TIMEOUT}s'
         )
         self.get_logger().info(
-            f'Controller mapping: LB=btn{self._LB}, RB=btn{self._RB}, '
-            f'sticks=axes[{self._LEFT_X},{self._LEFT_Y},'
-            f'{self._RIGHT_X},{self._RIGHT_Y}] (from {mapping_path or "defaults"})'
+            f'Controller mapping: LB=btn{self._LB}, RB=btn{self._RB} '
+            f'(from {mapping_path or "defaults"}); manual from /gamepad/cmd_vel'
         )
 
     def _joy_cb(self, msg: Joy):
@@ -128,6 +130,21 @@ class MuxNode(Node):
         self._auto_cmd.twist.angular.z = (
             max(-1.0, min(1.0, msg.twist.angular.z)) * self._max_yaw_rate
         )
+
+    def _gamepad_cb(self, msg: TwistStamped):
+        self._gamepad_cmd.twist.linear.x = (
+            max(-1.0, min(1.0, msg.twist.linear.x)) * self._max_speed
+        )
+        self._gamepad_cmd.twist.linear.y = (
+            max(-1.0, min(1.0, msg.twist.linear.y)) * self._max_speed
+        )
+        self._gamepad_cmd.twist.linear.z = (
+            max(-1.0, min(1.0, msg.twist.linear.z)) * self._max_speed
+        )
+        self._gamepad_cmd.twist.angular.z = (
+            max(-1.0, min(1.0, msg.twist.angular.z)) * self._max_yaw_rate
+        )
+        self._gamepad_stamp = time.monotonic()
 
     def _publish(self):
         out = TwistStamped()
@@ -162,17 +179,10 @@ class MuxNode(Node):
         rb_held = (len(joy.buttons) > self._RB and bool(joy.buttons[self._RB]))
 
         if lb_held and not rb_held:
-            # Manual mode: build command from latest joy axes
-            if len(joy.axes) > max(self._RIGHT_X, self._RIGHT_Y, self._LEFT_X, self._LEFT_Y):
-                pitch = self._apply_dead_zone(joy.axes[self._RIGHT_Y]) * self._max_speed
-                roll = self._apply_dead_zone(-joy.axes[self._RIGHT_X]) * self._max_speed
-                throttle = self._apply_dead_zone(joy.axes[self._LEFT_Y]) * self._max_speed
-                yaw = self._apply_dead_zone(-joy.axes[self._LEFT_X]) * self._max_yaw_rate
-
-                out.twist.linear.x = pitch
-                out.twist.linear.y = roll
-                out.twist.linear.z = throttle
-                out.twist.angular.z = yaw
+            # Manual mode: gamepad node's normalized command (scaled to m/s in
+            # _gamepad_cb). A stale command (dead gamepad node) holds zero.
+            if (time.monotonic() - self._gamepad_stamp) <= self._JOY_TIMEOUT:
+                out.twist = self._gamepad_cmd.twist
 
         elif rb_held and not lb_held:
             # Auto mode: student code
@@ -181,13 +191,6 @@ class MuxNode(Node):
         # else: neither or both -> zero velocity (hover)
 
         self._pub.publish(out)
-
-    def _apply_dead_zone(self, value: float) -> float:
-        dz = self._joy_dz
-        if abs(value) < dz:
-            return 0.0
-        sign = 1.0 if value > 0 else -1.0
-        return sign * (abs(value) - dz) / (1.0 - dz)
 
 
 def main(args=None):

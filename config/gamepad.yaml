@@ -1,0 +1,17 @@
+# Gamepad teleop node configuration for UAV Neo.
+#
+# The gamepad node reads the Xbox controller (/joy), normalizes the sticks to
+# [-1, 1], and publishes /gamepad/cmd_vel. The mux applies the LB/RB gating and
+# the speed limits (config/mux.yaml); this node only normalizes.
+#
+# The button/axis -> /joy index mapping comes from config/xbox_mapping.yaml
+# (shared with the mux and the student library). Override its path with the
+# mapping_config parameter if needed; by default it resolves to the installed
+# xbox_mapping.yaml.
+
+gamepad_node:
+  ros__parameters:
+    # Dead zone for the analog sticks (fraction, 0.0-1.0). Values below this are
+    # treated as zero to prevent drift; above it, the output is rescaled so the
+    # usable range still spans the full [-1, 1].
+    joystick_dead_zone: 0.15
