@@ -164,17 +164,28 @@ def generate_launch_description():
             os.path.join(launch_dir, 'mux.launch.py')),
     )
 
-    # Image relays: use BEST_EFFORT QoS to match RealSense/gscam publishers
+    # RealSense is mounted upside down, so its color and depth relays rotate the
+    # image 180 degrees. Toggle with realsense_flip (the downward Arducam is
+    # never rotated).
+    realsense_flip_arg = DeclareLaunchArgument(
+        'realsense_flip',
+        default_value='true',
+        description='Rotate RealSense color and depth 180 deg (upside-down mount)')
+
+    # Image relays: sensor-data QoS to match RealSense/gscam publishers
     # (topic_tools/relay defaults to RELIABLE and silently drops here).
     image_relay = os.path.join(pkg_dir, 'scripts', 'image_relay.py')
-    image_relay_pairs = [
-        ('/camera/color/image_raw',       '/camera/forward'),
-        ('/camera/depth/image_rect_raw',  '/camera/depth'),
-        ('/arducam/camera/image_raw',     '/camera/nadir'),
+    image_relay_specs = [
+        ('/camera/color/image_raw',       '/camera/forward', True),
+        ('/camera/depth/image_rect_raw',  '/camera/depth',   True),
+        ('/arducam/camera/image_raw',     '/camera/nadir',   False),
     ]
     image_relays = [
-        ExecuteProcess(cmd=['python3', image_relay, src, dst], output='log')
-        for src, dst in image_relay_pairs
+        ExecuteProcess(
+            cmd=['python3', image_relay, src, dst]
+                + ([LaunchConfiguration('realsense_flip')] if flip else []),
+            output='log')
+        for src, dst, flip in image_relay_specs
     ]
 
     # MAVROS topics are published RELIABLE, so topic_tools/relay works fine.
@@ -202,6 +213,7 @@ def generate_launch_description():
         edgetpu_enable_arg,
         edgetpu_config_arg,
         joy_device_arg,
+        realsense_flip_arg,
         mavros_launch,
         joy_node,
         mux_launch,

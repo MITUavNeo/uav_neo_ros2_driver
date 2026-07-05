@@ -742,7 +742,7 @@ The systemd service (`scripts/launch_teleop.sh`) passes `edgetpu_enable:=true` a
 ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true
 ```
 
-The launch also uses `image_relay.py` (a 30-line QoS-matched relay) for the three image topics rather than `topic_tools/relay`. The latter defaults to RELIABLE QoS, which silently drops from BEST_EFFORT image publishers like RealSense and gscam - see [`scripts/image_relay.py`](scripts/image_relay.py).
+The launch also uses `image_relay.py` (a QoS-matched relay) for the three image topics rather than `topic_tools/relay`. The latter defaults to RELIABLE QoS, which silently drops from BEST_EFFORT image publishers like RealSense and gscam - see [`scripts/image_relay.py`](scripts/image_relay.py). The RealSense is mounted upside down, so its color (`/camera/forward`) and depth (`/camera/depth`) relays rotate the image 180 degrees; disable with `realsense_flip:=false`. The downward Arducam (`/camera/nadir`) is never rotated. The rotation flips pixels only; the camera intrinsics (`camera_info`) are not adjusted, so pixel-space use is correct but precise 3D deprojection would need the principal point mirrored.
 
 **Available launch arguments:**
 
@@ -753,6 +753,7 @@ The launch also uses `image_relay.py` (a 30-line QoS-matched relay) for the thre
 | `pointcloud_enable` | `false` | Enable point cloud (CPU intensive) |
 | `depth_profile` | `640x480x15` | Depth stream resolution and FPS |
 | `color_profile` | `640x480x15` | Color stream resolution and FPS |
+| `realsense_flip` | `true` | Rotate RealSense color and depth 180 deg (camera mounted upside down) |
 | `arducam_width` | `640` | Arducam image width |
 | `arducam_height` | `480` | Arducam image height |
 | `arducam_framerate` | `30` | Arducam framerate |
