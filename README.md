@@ -1,22 +1,29 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.1.0**
+**Version: v1.2.0**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
-## What's in this repository
+## Repository contents
 
-- **Sensor stack** — RealSense D435i (depth + color + IMU), Arducam B0578 (downward global shutter), Coral EdgeTPU (object detection at ~26 ms/frame).
-- **Flight controller link** — MAVROS over UART to a Pixhawk running PX4.
-- **Two-pilot architecture** — RC safety pilot for emergency override (hardware-level via OFFBOARD switch); Xbox autonomy operator drives the mux node which arbitrates manual/auto velocity commands and enforces speed limits.
-- **Image-topic relays** — a small QoS-matched [`image_relay.py`](scripts/image_relay.py) that fixes the silent `topic_tools/relay` BEST_EFFORT/RELIABLE mismatch for camera streams.
-- **Standalone `mux.launch.py`** — used by the watchdog to restart the mux without re-spawning the entire teleop stack.
-- **Watchdog** — five-second-poll process supervisor with topic+process liveness checks (the topic-only check gives false positives whenever any relay subscribes), per-node restart cooldown, FastRTPS shared-memory orphan cleanup, and Pi 5 PMIC under-voltage detection (`/sys/class/hwmon/hwmon5/in0_lcrit_alarm`).
-- **Four systemd services** — `uav-teleop` (launches the full stack with EdgeTPU on by default), `uav-watchdog`, `uav-dashboard` (`:8080`), `uav-jupyter` (`:8888`). All start at boot.
-- **Networking** — eth0 carries a static `192.168.52.200/24` (laptop tether) **and** a DHCP address (router) simultaneously; wlan0 runs as an isolated AP `uav-neo-0` (10.42.0.1/24, FORWARD blocked so clients reach the Pi's services but not the internet).
-- **Setup automation** — `setup_all.sh` runs six phases (ROS2 → Pixhawk/MAVROS → RealSense → Arducam + gscam patch + Coral → services → networking) idempotently.
+- **Sensor stack**: RealSense D435i (depth + color + IMU), Arducam B0578 (downward global shutter), Coral EdgeTPU (object detection at ~26 ms/frame).
+- **Flight controller link**: MAVROS over UART to a Pixhawk running PX4.
+- **Two-pilot architecture**: RC safety pilot for emergency override (hardware-level via OFFBOARD switch); Xbox autonomy operator drives the mux node which arbitrates manual/auto velocity commands and enforces speed limits.
+- **Image-topic relays**: a small QoS-matched [`image_relay.py`](scripts/image_relay.py) that fixes the silent `topic_tools/relay` BEST_EFFORT/RELIABLE mismatch for camera streams.
+- **Standalone `mux.launch.py`**: used by the watchdog to restart the mux without re-spawning the entire teleop stack.
+- **Watchdog**: five-second-poll process supervisor with topic+process liveness checks (the topic-only check gives false positives whenever any relay subscribes), per-node restart cooldown, FastRTPS shared-memory orphan cleanup, and Pi 5 PMIC under-voltage detection (`/sys/class/hwmon/hwmon5/in0_lcrit_alarm`).
+- **Four systemd services**: `uav-teleop` (launches the full stack with EdgeTPU on by default), `uav-watchdog`, `uav-dashboard` (`:8080`), `uav-jupyter` (`:8888`). All start at boot.
+- **Networking**: eth0 carries a static `192.168.52.200/24` (laptop tether) **and** a DHCP address (router) simultaneously; wlan0 runs as an isolated AP `uav-neo-0` (10.42.0.1/24, FORWARD blocked so clients reach the Pi's services but not the internet).
+- **Setup automation**: `setup_all.sh` runs six phases (ROS2 -> Pixhawk/MAVROS -> RealSense -> Arducam + gscam patch + Coral -> services -> networking) idempotently.
 
 ## Release notes
+
+### v1.2.0 (2026-07-05)
+
+- Added a `gamepad_node` that normalizes the Xbox controller (`/joy`) into `/gamepad/cmd_vel`, so the drone can be flown manually (LB held) with no student-library code. The mux now consumes that topic for manual mode and keeps the LB/RB gating and speed limits.
+- RealSense color and depth are rotated 180 degrees in the relay to correct the upside-down camera mount (toggle with `realsense_flip`); the downward Arducam is unaffected.
+- Repo-wide syntax pass: all prose and code is ASCII (no em-dashes), README headings are noun-phrase and sentence case, and the table of contents anchors are verified.
+- Lint: `ament_flake8`, `ament_pep257`, and `ament_copyright` tests pass. Added GPLv3 license headers, a `LICENSE` file, and `CONTRIBUTING.md`; set the package license to `GPL-3.0-or-later`.
 
 ### v1.1.0 (2026-07-05)
 
@@ -48,48 +55,49 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - USB autosuspend disabled by udev rule for both cameras
 - eth0 dual-IP + isolated wlan0 AP automated by `setup_networking.sh`
 
-## Table of Contents
+## Table of contents
 
-- [What's in this repository](#whats-in-this-repository)
+- [Repository contents](#repository-contents)
 - [Release notes](#release-notes)
 - [Overview](#overview)
 - [Hardware](#hardware)
-- [Two-Pilot Operation](#two-pilot-operation)
-- [Safety Architecture](#safety-architecture)
-- [Topic Architecture](#topic-architecture)
-- [Quick Start (Automated Setup)](#quick-start-automated-setup)
-- [Manual Setup](#manual-setup)
-  - [Install ROS2 Jazzy](#install-ros2-jazzy)
-  - [Enable UART for Pixhawk](#enable-uart-for-pixhawk)
-  - [Disable Serial Console and SysRq (Critical)](#disable-serial-console-and-sysrq-critical)
-  - [Disable Bluetooth on UART](#disable-bluetooth-on-uart)
-  - [Set Serial Port Permissions](#set-serial-port-permissions)
-  - [Pixhawk Parameter Configuration](#pixhawk-parameter-configuration)
-  - [Install MAVROS](#install-mavros)
-  - [Install RealSense Camera Driver](#install-realsense-camera-driver)
-  - [Install Arducam Global Shutter Camera Driver](#install-arducam-global-shutter-camera-driver)
-  - [Install Coral EdgeTPU Dependencies](#install-coral-edgetpu-dependencies)
-- [Verifying Peripherals](#verifying-peripherals)
-- [Building the Package](#building-the-package)
-- [Testing](#testing)
-- [Launching](#launching)
+- [Two-pilot operation](#two-pilot-operation)
+- [Safety architecture](#safety-architecture)
+- [Topic architecture](#topic-architecture)
+- [Quick start (automated setup)](#quick-start-automated-setup)
+- [Manual setup](#manual-setup)
+  - [ROS2 Jazzy installation](#ros2-jazzy-installation)
+  - [Pixhawk UART setup](#pixhawk-uart-setup)
+  - [Serial console and SysRq deactivation (critical)](#serial-console-and-sysrq-deactivation-critical)
+  - [Bluetooth-on-UART removal](#bluetooth-on-uart-removal)
+  - [Serial port permissions](#serial-port-permissions)
+  - [Pixhawk parameter configuration](#pixhawk-parameter-configuration)
+  - [MAVROS installation](#mavros-installation)
+  - [RealSense camera driver installation](#realsense-camera-driver-installation)
+  - [Arducam global shutter camera driver installation](#arducam-global-shutter-camera-driver-installation)
+  - [Coral EdgeTPU dependencies](#coral-edgetpu-dependencies)
+- [Peripheral verification](#peripheral-verification)
+- [Package build](#package-build)
+- [Tests](#tests)
+- [Launch commands](#launch-commands)
   - [MAVROS](#mavros)
   - [RealSense D435i](#realsense-d435i)
   - [Arducam B0578](#arducam-b0578)
-  - [All Sensors (Teleop)](#all-sensors-teleop)
-  - [Mux Node](#mux-node)
-  - [EdgeTPU Inference](#edgetpu-inference)
+  - [All sensors (teleop)](#all-sensors-teleop)
+  - [Mux node](#mux-node)
+  - [Gamepad node](#gamepad-node)
+  - [EdgeTPU inference](#edgetpu-inference)
 - [Services](#services)
-  - [Teleop Autostart](#teleop-autostart)
-  - [Node Watchdog](#node-watchdog)
-  - [Web Dashboard](#web-dashboard)
+  - [Teleop autostart](#teleop-autostart)
+  - [Node watchdog](#node-watchdog)
+  - [Web dashboard](#web-dashboard)
   - [JupyterLab](#jupyterlab)
-  - [Managing Services](#managing-services)
-- [Networking](#networking)
-  - [eth0 — dual-IP (static + DHCP)](#eth0--dual-ip-static--dhcp)
-  - [wlan0 — isolated access point](#wlan0--isolated-access-point)
+  - [Service management](#service-management)
+- [Network configuration](#network-configuration)
+  - [eth0 dual-IP (static + DHCP)](#eth0-dual-ip-static--dhcp)
+  - [wlan0 isolated access point](#wlan0-isolated-access-point)
   - [Setup](#setup)
-- [Logging](#logging)
+- [Logs](#logs)
 
 ## Overview
 
@@ -105,7 +113,7 @@ UAV Neo is an educational autonomous drone platform. This ROS2 package provides 
 | Pixhawk 2.8.4 (clone) | UART (TELEM2) | `/dev/ttyAMA0` | Flight controller running PX4 |
 | Xbox-compatible controller | USB (wireless dongle) | `/dev/input/js0` | Autonomy operator gamepad for student programs |
 
-## Two-Pilot Operation
+## Two-pilot operation
 
 UAV Neo requires **two operators** for safe flight:
 
@@ -129,36 +137,36 @@ UAV Neo requires **two operators** for safe flight:
 
 | Input | Function |
 |---|---|
-| **LB held** | Manual mode — Xbox sticks control the drone through the mux |
-| **RB held** | Auto mode — student code controls the drone through the mux |
-| **Neither bumper** | Idle — zero velocity (hover) |
-| **Both bumpers** | Idle — zero velocity (hover) |
+| **LB held** | Manual mode - Xbox sticks control the drone through the mux |
+| **RB held** | Auto mode - student code controls the drone through the mux |
+| **Neither bumper** | Idle - zero velocity (hover) |
+| **Both bumpers** | Idle - zero velocity (hover) |
 | START | Enter student program mode |
 | BACK | Return to default mode |
 | START + BACK | Exit program |
 
 The Xbox controller has **no direct connection** to the flight controller. All commands pass through the mux node, which enforces speed limits from `config/mux.yaml`.
 
-## Safety Architecture
+## Safety architecture
 
 The system has multiple layers of safety to prevent uncontrolled flight:
 
-**1. Mux node (`mux_node`)** — Arbitrates all velocity commands. Student code cannot send flight commands directly to MAVROS. The mux enforces:
+**1. Mux node (`mux_node`)**: Arbitrates all velocity commands. Student code cannot send flight commands directly to MAVROS. The mux enforces:
 - Speed limits (`max_speed` and `max_yaw_rate` from `config/mux.yaml`)
 - Bumper gating (commands only pass through when LB or RB is held)
-- Xbox controller disconnect detection (500ms timeout → zero velocity)
+- Xbox controller disconnect detection (500ms timeout -> zero velocity)
 
-**2. PX4 OFFBOARD timeout** — If the Pi stops sending setpoints for more than `COM_OF_LOSS_T` (1.0s), PX4 automatically exits OFFBOARD mode and reverts to the safety pilot's RC mode switch setting.
+**2. PX4 OFFBOARD timeout**: If the Pi stops sending setpoints for more than `COM_OF_LOSS_T` (1.0s), PX4 automatically exits OFFBOARD mode and reverts to the safety pilot's RC mode switch setting.
 
-**3. RC transmitter override** — The safety pilot can switch out of OFFBOARD mode at any time via Switch D. This is a hardware-level override that cannot be blocked by software.
+**3. RC transmitter override**: The safety pilot can switch out of OFFBOARD mode at any time via Switch D. This is a hardware-level override that cannot be blocked by software.
 
-**4. Student code isolation** — The student library cannot:
+**4. Student code isolation**: The student library cannot:
 - Arm or disarm the motors
 - Change flight modes (OFFBOARD, STABILIZED, etc.)
 - Set the speed limit (enforced by mux config, not student code)
 - Publish directly to MAVROS velocity topics (all commands go through `/mux/cmd_vel`)
 
-**5. Exception handling** — If student code crashes, the library catches the exception, logs it, and sends a stop command (zero velocity). The run loop continues operating.
+**5. Exception handling**: If student code crashes, the library catches the exception, logs it, and sends a stop command (zero velocity). The run loop continues operating.
 
 **Required PX4 parameters** (set via QGroundControl):
 
@@ -168,7 +176,7 @@ The system has multiple layers of safety to prevent uncontrolled flight:
 | `COM_RCL_EXCEPT` | `4` | Allow OFFBOARD even if RC link drops |
 | `RC_MAP_OFFB_SW` | `8` | Channel 8 (Switch D) controls OFFBOARD mode |
 
-## Topic Architecture
+## Topic architecture
 
 The driver publishes sensor data on standard ROS2 topic names. The teleop launch file creates topic relays that map these to simplified names used by the student library:
 
@@ -185,13 +193,17 @@ The driver publishes sensor data on standard ROS2 topic names. The teleop launch
 **Flight command flow:**
 
 ```
-Student code                Xbox controller
-     │                            │
- send_pcmd()                  joy_node
-     │                            │
- /mux/cmd_vel              /joy (buttons + axes)
-     │                            │
-     └──────────┬─────────────────┘
+Student code            Xbox controller
+     │                        │
+ send_pcmd()              joy_node
+     │                        │
+     │                      /joy ───────────┐ (buttons: LB/RB gating)
+     │                        │             │
+     │                   gamepad_node       │
+     │                        │             │
+ /mux/cmd_vel        /gamepad/cmd_vel       │
+     │                        │             │
+     └──────────┬─────────────┴─────────────┘
                 │
            mux_node (LB/RB gating + speed limit)
                 │
@@ -211,7 +223,7 @@ Student code                Xbox controller
 | `/edgetpu/inference` | `vision_msgs/Detection2DArray` | EdgeTPU object detection results |
 | `/diagnostics` | `diagnostic_msgs/DiagnosticArray` | System health from all nodes |
 
-## Quick Start (Automated Setup)
+## Quick start (automated setup)
 
 Setup scripts are provided in `scripts/` that automate the entire installation. Run the all-in-one script:
 
@@ -233,7 +245,7 @@ This runs five phases in series (Phase 4 has sub-phases):
 | 4c | `scripts/setup_coral.sh` | Install Coral EdgeTPU runtime, pycoral, tflite, udev rule |
 | 5 | `scripts/setup_services.sh` | Install systemd services, JupyterLab, create log dirs |
 
-> **Reboot required:** Phase 2 modifies UART and Bluetooth kernel settings that require a reboot. The script will detect this and prompt you. After rebooting, re-run `./scripts/setup_all.sh` — already-completed phases are skipped automatically.
+> **Reboot required:** Phase 2 modifies UART and Bluetooth kernel settings that require a reboot. The script will detect this and prompt you. After rebooting, re-run `./scripts/setup_all.sh` - already-completed phases are skipped automatically.
 
 After setup completes, the script builds the workspace. You can then verify everything works:
 
@@ -245,7 +257,7 @@ The individual scripts can also be run standalone (e.g., `./scripts/setup_realse
 
 > **Note:** Pixhawk parameters (MAV_1_CONFIG, SER_TEL2_BAUD, etc.) must still be configured manually via QGroundControl. See [Pixhawk Parameter Configuration](#pixhawk-parameter-configuration) below.
 
-### After Boot
+### After boot
 
 All services start automatically on boot. Use these commands to manage them:
 
@@ -292,11 +304,11 @@ tail -f ~/logs/latest/teleop.log     # same output, plain text
 
 > **Tip:** After rebuilding the workspace (`colcon build`), restart the teleop service to pick up the new code. The watchdog will automatically restart any nodes that crash.
 
-## Manual Setup
+## Manual setup
 
-The sections below document each setup step in detail. If you used the automated setup scripts above, these are already done — use this as a reference.
+The sections below document each setup step in detail. If you used the automated setup scripts above, these are already done - use this as a reference.
 
-### Install ROS2 Jazzy
+### ROS2 Jazzy installation
 
 An install script is provided in `scripts/`. Run:
 
@@ -313,7 +325,7 @@ Once complete, open a new terminal or run:
 source ~/.bashrc
 ```
 
-### Enable UART for Pixhawk
+### Pixhawk UART setup
 
 The Pixhawk connects to the Raspberry Pi via UART on GPIO 14 (TX) / GPIO 15 (RX) through the TELEM2 port.
 
@@ -334,12 +346,12 @@ sudo reboot
 
 After reboot, `/dev/ttyAMA0` should be available.
 
-### Disable Serial Console and SysRq (Critical)
+### Serial console and SysRq deactivation (critical)
 
 > **WARNING:** Do **not** connect the Pixhawk UART before completing **all** steps in this section and the next (Disable Bluetooth on UART). Ubuntu defaults to using the UART as a kernel boot console, login shell, and SysRq input. MAVLink data from the Pixhawk will be interpreted as system commands, causing two failure modes:
 >
-> 1. **Boot loop** — MAVLink data is interpreted as console/login input, preventing the Pi from booting. Can only be resolved by physically disconnecting the Pixhawk.
-> 2. **System crash** — MAVLink byte sequences are interpreted as kernel SysRq commands (e.g., emergency remount read-only, sync, reboot), causing the filesystem to go read-only and the system to lock up.
+> 1. **Boot loop**: MAVLink data is interpreted as console/login input, preventing the Pi from booting. Can only be resolved by physically disconnecting the Pixhawk.
+> 2. **System crash**: MAVLink byte sequences are interpreted as kernel SysRq commands (e.g., emergency remount read-only, sync, reboot), causing the filesystem to go read-only and the system to lock up.
 
 1. Remove the serial console from the kernel command line:
 
@@ -380,9 +392,9 @@ sudo systemctl is-enabled serial-getty@ttyAMA0.service
 cat /proc/sys/kernel/sysrq
 ```
 
-### Disable Bluetooth on UART
+### Bluetooth-on-UART removal
 
-By default, the Pi's Bluetooth controller uses the PL011 UART (`/dev/ttyAMA0`) — the same port needed for the Pixhawk. Bluetooth must be moved off this UART to avoid conflicts.
+By default, the Pi's Bluetooth controller uses the PL011 UART (`/dev/ttyAMA0`) - the same port needed for the Pixhawk. Bluetooth must be moved off this UART to avoid conflicts.
 
 1. Add the `disable-bt` overlay to `/boot/firmware/config.txt`:
 
@@ -404,7 +416,7 @@ sudo reboot
 
 It is now safe to connect the Pixhawk UART to the Pi.
 
-### Set Serial Port Permissions
+### Serial port permissions
 
 Add your user to the `dialout` group to access the serial port without `sudo`:
 
@@ -414,7 +426,7 @@ sudo usermod -aG dialout $USER
 
 Log out and back in (or reboot) for the group change to take effect.
 
-### Pixhawk Parameter Configuration
+### Pixhawk parameter configuration
 
 The Pixhawk must be configured to output MAVLink on TELEM2. Connect to the Pixhawk using **QGroundControl** and set the following parameters:
 
@@ -437,7 +449,7 @@ After setting parameters, reboot the Pixhawk for changes to take effect.
 
 > **Note:** TX and RX must be **crossed** (TX to RX, RX to TX). Do not connect the TELEM2 5V pin to the Pi.
 
-### Install MAVROS
+### MAVROS installation
 
 MAVROS provides a standard ROS2 interface to the Pixhawk over MAVLink, publishing sensor data as ROS2 topics and exposing services for arming, mode switching, and sending commands.
 
@@ -470,7 +482,7 @@ ros2 topic echo /mavros/imu/data --once
 ros2 topic echo /mavros/rc/in --once
 ```
 
-### Install RealSense Camera Driver
+### RealSense camera driver installation
 
 The Intel RealSense D435i provides depth, color, infrared, and IMU data over USB 3.0. The `realsense2_camera` ROS2 package publishes all streams as standard ROS2 topics.
 
@@ -530,7 +542,7 @@ ros2 topic echo /camera/depth/image_rect_raw --once
 ros2 topic echo /camera/imu --once
 ```
 
-### Install Arducam Global Shutter Camera Driver
+### Arducam global shutter camera driver installation
 
 The Arducam B0578 is a 2.3MP global shutter camera connected over USB 2.0. It outputs MJPEG which is decoded via GStreamer. The `gscam` ROS2 package bridges GStreamer pipelines to standard ROS2 image topics.
 
@@ -573,7 +585,7 @@ ros2 run gscam gscam_node --ros-args \
 ros2 topic echo /arducam/camera/image_raw --once
 ```
 
-### Install Coral EdgeTPU Dependencies
+### Coral EdgeTPU dependencies
 
 The Coral EdgeTPU USB Accelerator is used for onboard ML inference. Pre-built packages for Ubuntu 24.04 (aarch64) are included in `depend/`.
 
@@ -587,9 +599,9 @@ chmod +x scripts/setup_coral.sh
 ```
 
 This installs:
-- `libedgetpu1-std` — EdgeTPU runtime library (`.deb`)
-- `tflite_runtime` — TensorFlow Lite interpreter (`.whl`)
-- `pycoral` — High-level Python API for EdgeTPU (`.whl`)
+- `libedgetpu1-std` - EdgeTPU runtime library (`.deb`)
+- `tflite_runtime` - TensorFlow Lite interpreter (`.whl`)
+- `pycoral` - High-level Python API for EdgeTPU (`.whl`)
 - Udev rule at `/etc/udev/rules.d/99-coral-edgetpu.rules` for non-root USB access
 
 2. Verify the TPU is detected:
@@ -600,7 +612,7 @@ python3 -c "from pycoral.utils.edgetpu import list_edge_tpus; print(list_edge_tp
 
 You should see `[{'type': 'usb', 'path': '/sys/bus/usb/devices/...'}]`.
 
-## Verifying Peripherals
+## Peripheral verification
 
 Run the following commands to confirm all peripherals are visible to the Pi:
 
@@ -640,7 +652,7 @@ python3 -c "from pycoral.utils.edgetpu import list_edge_tpus; print(list_edge_tp
 
 Should show `[{'type': 'usb', 'path': '/sys/bus/usb/devices/...'}]`.
 
-## Building the Package
+## Package build
 
 ```bash
 source /opt/ros/jazzy/setup.bash
@@ -649,17 +661,17 @@ colcon build --packages-select uav_neo_ros2_driver
 source install/setup.bash
 ```
 
-## Testing
+## Tests
 
 Hardware connectivity tests verify that all sensors are plugged in, detected, and accessible before launching any ROS2 nodes.
 
-### Run all hardware tests
+### Hardware test run
 
 ```bash
 colcon test --packages-select uav_neo_ros2_driver --pytest-args -k hardware -v
 ```
 
-### What the tests check
+### Test coverage
 
 | Test Class | Tests | What it verifies |
 |---|---|---|
@@ -667,18 +679,18 @@ colcon test --packages-select uav_neo_ros2_driver --pytest-args -k hardware -v
 | `TestRealSense` | 5 | USB device on bus, V4L2 devices registered, rs-enumerate finds D435i, USB 3.x connection, IMU IIO permissions |
 | `TestArducam` | 4 | USB device on bus, V4L2 device listed, device node accessible, MJPEG format available |
 | `TestCoralTPU` | 8 | USB device on bus (pre/post-init IDs), libedgetpu installed, tflite_runtime importable, pycoral importable, EdgeTPU runtime detects TPU, classification inference <100 ms, detection inference <50 ms, udev rule exists |
-| `TestDependencies` | 5 | ROS2 packages installed (mavros, realsense2_camera, gscam — 3 parametrized cases), GeographicLib datasets, IMU fix script |
+| `TestDependencies` | 5 | ROS2 packages installed (mavros, realsense2_camera, gscam - 3 parametrized cases), GeographicLib datasets, IMU fix script |
 
 Each test assertion includes a human-readable error message with the exact command to fix the issue.
 
-### Run all tests (including linters)
+### Full test run (including linters)
 
 ```bash
 colcon test --packages-select uav_neo_ros2_driver
 colcon test-result --verbose
 ```
 
-## Launching
+## Launch commands
 
 ### MAVROS
 
@@ -728,9 +740,9 @@ ros2 launch uav_neo_ros2_driver arducam.launch.py image_width:=1280 image_height
 
 > **Note:** Requires the patched gscam build (`scripts/patch_gscam.sh`). The stock apt package will leak memory.
 
-### All Sensors (Teleop)
+### All sensors (teleop)
 
-Launch the full stack — MAVROS, RealSense, Arducam, joy node, mux (via `mux.launch.py`), topic relays, and (by default in the systemd boot path) EdgeTPU inference:
+Launch the full stack - MAVROS, RealSense, Arducam, joy node, mux (via `mux.launch.py`), topic relays, and (by default in the systemd boot path) EdgeTPU inference:
 
 ```bash
 ros2 launch uav_neo_ros2_driver teleop.launch.py
@@ -742,7 +754,7 @@ The systemd service (`scripts/launch_teleop.sh`) passes `edgetpu_enable:=true` a
 ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true
 ```
 
-The launch also uses `image_relay.py` (a 30-line QoS-matched relay) for the three image topics rather than `topic_tools/relay`. The latter defaults to RELIABLE QoS, which silently drops from BEST_EFFORT image publishers like RealSense and gscam — see [`scripts/image_relay.py`](scripts/image_relay.py).
+The launch also uses `image_relay.py` (a QoS-matched relay) for the three image topics rather than `topic_tools/relay`. The latter defaults to RELIABLE QoS, which silently drops from BEST_EFFORT image publishers like RealSense and gscam - see [`scripts/image_relay.py`](scripts/image_relay.py). The RealSense is mounted upside down, so its color (`/camera/forward`) and depth (`/camera/depth`) relays rotate the image 180 degrees; disable with `realsense_flip:=false`. The downward Arducam (`/camera/nadir`) is never rotated. The rotation flips pixels only; the camera intrinsics (`camera_info`) are not adjusted, so pixel-space use is correct but precise 3D deprojection would need the principal point mirrored.
 
 **Available launch arguments:**
 
@@ -753,6 +765,7 @@ The launch also uses `image_relay.py` (a 30-line QoS-matched relay) for the thre
 | `pointcloud_enable` | `false` | Enable point cloud (CPU intensive) |
 | `depth_profile` | `640x480x15` | Depth stream resolution and FPS |
 | `color_profile` | `640x480x15` | Color stream resolution and FPS |
+| `realsense_flip` | `true` | Rotate RealSense color and depth 180 deg (camera mounted upside down) |
 | `arducam_width` | `640` | Arducam image width |
 | `arducam_height` | `480` | Arducam image height |
 | `arducam_framerate` | `30` | Arducam framerate |
@@ -761,15 +774,20 @@ The launch also uses `image_relay.py` (a 30-line QoS-matched relay) for the thre
 | `mux_config` | `config/mux.yaml` | Mux node configuration file (consumed by `mux.launch.py`) |
 | `joy_device` | `/dev/input/js0` | Xbox controller device path |
 
-### Mux Node
+### Mux node
 
-The mux node arbitrates between manual (Xbox sticks) and autonomous (student code) velocity commands. It is included automatically in the teleop launch.
+The mux node arbitrates between the manual gamepad command and the autonomous (student code) command. It is included automatically in the teleop launch. Both sources send a normalized `[-1, 1]` `TwistStamped`; the mux scales by `max_speed`/`max_yaw_rate` and forwards to MAVROS.
 
 **Behavior:**
-- **LB held** — manual mode: Xbox stick inputs are scaled by `max_speed` and forwarded to MAVROS
-- **RB held** — auto mode: student code commands (from `/mux/cmd_vel`) are scaled and forwarded
-- **Neither bumper** — idle: zero velocity published (drone hovers)
-- **Controller disconnected** — if no `/joy` message for 500ms, zero velocity published
+- **LB held**: manual mode: the gamepad node's command (`/gamepad/cmd_vel`) is scaled and forwarded
+- **RB held**: auto mode: student code commands (from `/mux/cmd_vel`) are scaled and forwarded
+- **Neither bumper**: idle: zero velocity published (drone hovers)
+- **Controller disconnected**: if no `/joy` message for 500ms, zero velocity published
+- **Stale source**: a manual or auto command older than 500ms holds zero (e.g. a dead gamepad node)
+
+### Gamepad node
+
+The gamepad node (`gamepad_node`) reads the Xbox controller (`/joy`), normalizes the sticks to `[-1, 1]` (deadzone from `config/gamepad.yaml`), and publishes `/gamepad/cmd_vel` for the mux. This lets a pilot fly manually (LB held) without running any student-library code. It reads the stick axis indices from `config/xbox_mapping.yaml` and ignores frames from a wrong-mode controller. The mux owns the LB/RB gating and the speed limits; the gamepad node only normalizes.
 
 **Stick mapping (Mode 2):**
 
@@ -840,10 +858,10 @@ would also be blocked; the kit never uses one.)
 |---|---|---|
 | `max_speed` | `0.5` | Maximum velocity in m/s for all axes |
 | `max_yaw_rate` | `0.5` | Maximum yaw rate in rad/s |
-| `joystick_dead_zone` | `0.15` | Stick dead zone (fraction, 0.0–1.0) |
+| `joystick_dead_zone` | `0.15` | Stick dead zone (fraction, 0.0-1.0) |
 | `publish_rate` | `20.0` | Setpoint publish rate in Hz (must be >2 for PX4 OFFBOARD) |
 
-### EdgeTPU Inference
+### EdgeTPU inference
 
 When enabled via `edgetpu_enable:=true`, the EdgeTPU node subscribes to `/camera/forward`, runs object detection on the Coral USB Accelerator, and publishes results to `/edgetpu/inference` (`vision_msgs/Detection2DArray`).
 
@@ -863,7 +881,7 @@ The default model runs at ~26ms per frame (~38 FPS) on USB 3.0.
 
 Four systemd services are installed by `scripts/setup_services.sh` (or Phase 5 of `setup_all.sh`). All services start automatically on boot.
 
-### Teleop Autostart
+### Teleop autostart
 
 The `uav-teleop` service launches the full stack (MAVROS + RealSense + Arducam + joy node + mux node + topic relays) on boot using `scripts/launch_teleop.sh`. This wrapper creates a timestamped log directory under `~/logs/` before launching.
 
@@ -873,11 +891,11 @@ sudo systemctl stop uav-teleop     # stop
 sudo systemctl restart uav-teleop  # restart (creates new log session)
 ```
 
-### Node Watchdog
+### Node watchdog
 
 The `uav-watchdog` service monitors the sensor nodes and mux node every 5 seconds. When a node disappears:
 
-1. Determines liveness from **two checks**: the topic appears in `ros2 topic list` *and* the node binary is in `ps`. The process check is necessary because `ros2 topic list` includes subscriber-only topics — `image_relay` keeps the camera topics in the graph, and MAVROS keeps `/mavros/setpoint_velocity/cmd_vel`, so the topic check alone gives false positives. Each `NODES` entry supplies a `process_check` callable that pgreps for the binary path (e.g. `/install/gscam/lib/gscam/gscam_node`).
+1. Determines liveness from **two checks**: the topic appears in `ros2 topic list` *and* the node binary is in `ps`. The process check is necessary because `ros2 topic list` includes subscriber-only topics - `image_relay` keeps the camera topics in the graph, and MAVROS keeps `/mavros/setpoint_velocity/cmd_vel`, so the topic check alone gives false positives. Each `NODES` entry supplies a `process_check` callable that pgreps for the binary path (e.g. `/install/gscam/lib/gscam/gscam_node`).
 2. Checks if the underlying hardware is still connected (UART for Pixhawk, USB for cameras).
 3. If connected: kills any stale matches of the `kill_pattern`, then relaunches the **node-specific** launch file (e.g. `arducam.launch.py` for arducam, `mux.launch.py` for mux). Mux uses a standalone launch file rather than `teleop.launch.py` to prevent a mux restart from cascade-respawning the entire stack.
 4. If disconnected: logs a warning and waits for the device to reappear.
@@ -887,10 +905,10 @@ The watchdog starts 15 seconds after teleop to allow all nodes to initialize. Lo
 
 Two periodic background tasks also run from the watchdog:
 
-- **FastRTPS shared-memory orphan cleanup** — every 60 s, removes 0-byte `/dev/shm/fastrtps_port*` segments and stranded `_el` / `sem.*_mutex` lock files left behind by ros2 processes killed mid-init. Without this, any future `rclpy.create_node()` that hashes to a poisoned port spins forever (the "Jupyter cell hangs at drone init" symptom). `launch_teleop.sh` runs the same cleanup once on each (re)start as defense-in-depth before any rclpy participants start.
-- **Pi 5 under-voltage detection** — checks `/sys/class/hwmon/hwmon5/in0_lcrit_alarm` (sticky bit, set by the Pi PMIC on first 5V-rail dip below threshold). Logs `Pi under-voltage alarm armed (...)` at startup and a single `[WARNING] Pi under-voltage alarm tripped — ...` the moment the bit flips. After any flight, `grep under-voltage ~/logs/latest/watchdog.log` will tell you whether the BEC sagged. If it did, expect cascading USB device resets (gscam in particular dies with `Could not get gstreamer sample`); the fix is hardware (5V/5A+ BEC, bulk caps near the Pi, or a separate USB power injector).
+- **FastRTPS shared-memory orphan cleanup**: every 60 s, removes 0-byte `/dev/shm/fastrtps_port*` segments and stranded `_el` / `sem.*_mutex` lock files left behind by ros2 processes killed mid-init. Without this, any future `rclpy.create_node()` that hashes to a poisoned port spins forever (the "Jupyter cell hangs at drone init" symptom). `launch_teleop.sh` runs the same cleanup once on each (re)start as defense-in-depth before any rclpy participants start.
+- **Pi 5 under-voltage detection**: checks `/sys/class/hwmon/hwmon5/in0_lcrit_alarm` (sticky bit, set by the Pi PMIC on first 5V-rail dip below threshold). Logs `Pi under-voltage alarm armed (...)` at startup and a single `[WARNING] Pi under-voltage alarm tripped - ...` the moment the bit flips. After any flight, `grep under-voltage ~/logs/latest/watchdog.log` will tell you whether the BEC sagged. If it did, expect cascading USB device resets (gscam in particular dies with `Could not get gstreamer sample`); the fix is hardware (5V/5A+ BEC, bulk caps near the Pi, or a separate USB power injector).
 
-### Web Dashboard
+### Web dashboard
 
 The `uav-dashboard` service runs a web-based monitoring page on **port 8080**. Open in a browser:
 
@@ -903,7 +921,7 @@ The dashboard shows:
 - Topic publish rates with stale/dead detection
 - Recent watchdog restart events
 
-The page auto-refreshes every 3 seconds. No additional dependencies are required — it uses Python's built-in HTTP server.
+The page auto-refreshes every 3 seconds. No additional dependencies are required - it uses Python's built-in HTTP server.
 
 ### JupyterLab
 
@@ -924,7 +942,7 @@ pip3 install --break-system-packages jupyterlab nptyping==1.4.4 pandas matplotli
 mkdir -p ~/jupyter_ws
 ```
 
-### Managing Services
+### Service management
 
 **Check status of all services:**
 
@@ -953,11 +971,11 @@ journalctl -u uav-dashboard -f      # dashboard server
 journalctl -u uav-jupyter -f        # JupyterLab server
 ```
 
-## Networking
+## Network configuration
 
 The Pi has two network interfaces, each configured for a specific role.
 
-### eth0 — dual-IP (static + DHCP)
+### eth0 dual-IP (static + DHCP)
 
 eth0 carries both a fixed static address for direct laptop tethering **and** a DHCP-assigned address from any router it's plugged into, simultaneously. Either path reaches every service on the Pi.
 
@@ -966,11 +984,11 @@ eth0 carries both a fixed static address for direct laptop tethering **and** a D
 | `192.168.52.200/24` | static | Laptop direct-connect (no router needed) |
 | `10.0.0.x/24` (or whatever DHCP gives) | DHCP from connected router | Internet access for the Pi, easy network connectivity |
 
-The default route comes from DHCP when present, so the Pi has internet access whenever it's on a router. Direct-tether keeps working at `192.168.52.200` regardless. Configuration lives in a single netplan file managed by NetworkManager (`/etc/netplan/90-NM-…yaml`) using `ipv4.method: auto`, `ipv4.addresses: [192.168.52.200/24]`, `optional: true`, and `ipv4.may-fail: true`. **Do not put network setup in launch scripts** — netplan is the source of truth.
+The default route comes from DHCP when present, so the Pi has internet access whenever it's on a router. Direct-tether keeps working at `192.168.52.200` regardless. Configuration lives in a single netplan file managed by NetworkManager (`/etc/netplan/90-NM-...yaml`) using `ipv4.method: auto`, `ipv4.addresses: [192.168.52.200/24]`, `optional: true`, and `ipv4.may-fail: true`. **Do not put network setup in launch scripts**: netplan is the source of truth.
 
 > **Subnet caveat:** if your router happens to also be on `192.168.52.0/24`, you'll get an address collision. Pick a different static subnet for the Pi in that case.
 
-### wlan0 — isolated access point
+### wlan0 isolated access point
 
 wlan0 runs as an isolated Wi-Fi access point so laptops, tablets, and phones can connect directly to the drone for SSH / Jupyter / dashboard access without an external router.
 
@@ -980,10 +998,10 @@ wlan0 runs as an isolated Wi-Fi access point so laptops, tablets, and phones can
 | PSK | `uavneo@mit` |
 | Mode | WPA2-PSK, 2.4 GHz, channel 6 |
 | Pi address | `10.42.0.1/24` |
-| DHCP for clients | `10.42.0.10 – 10.42.0.254` (NM's internal dnsmasq, 1-hour leases) |
-| Internet for clients | **blocked** — see isolation note below |
+| DHCP for clients | `10.42.0.10 - 10.42.0.254` (NM's internal dnsmasq, 1-hour leases) |
+| Internet for clients | **blocked**: see isolation note below |
 
-Once a client connects, it can reach `http://10.42.0.1:8080` (dashboard), `http://10.42.0.1:8888` (Jupyter), or SSH to `10.42.0.1`. It **cannot** route out to the internet through the Pi — even though the Pi itself has internet via eth0. The isolation is enforced by a NetworkManager dispatcher script at `/etc/NetworkManager/dispatcher.d/99-uav-ap-isolate` that inserts `iptables FORWARD … -j REJECT` rules whenever the AP comes up and removes them on down. Rules are reinstalled by the dispatcher on every connection-up, so no separate persistence layer is needed.
+Once a client connects, it can reach `http://10.42.0.1:8080` (dashboard), `http://10.42.0.1:8888` (Jupyter), or SSH to `10.42.0.1`. It **cannot** route out to the internet through the Pi - even though the Pi itself has internet via eth0. The isolation is enforced by a NetworkManager dispatcher script at `/etc/NetworkManager/dispatcher.d/99-uav-ap-isolate` that inserts `iptables FORWARD ... -j REJECT` rules whenever the AP comes up and removes them on down. Rules are reinstalled by the dispatcher on every connection-up, so no separate persistence layer is needed.
 
 ### Setup
 
@@ -993,7 +1011,7 @@ The networking setup is automated by `scripts/setup_networking.sh` (run by `setu
 ./scripts/setup_networking.sh
 ```
 
-This installs the AP-isolation dispatcher, deletes any prior Wi-Fi client connection on wlan0 (the original `Duck` connection from a previous build), creates the `uav-neo-ap` NM connection, and rewrites the eth0 netplan file for the dual-IP behavior. `netplan apply` is invoked at the end to bring everything up. You can re-run the script idempotently — it skips work that's already done.
+This installs the AP-isolation dispatcher, deletes any prior Wi-Fi client connection on wlan0 (the original `Duck` connection from a previous build), creates the `uav-neo-ap` NM connection, and rewrites the eth0 netplan file for the dual-IP behavior. `netplan apply` is invoked at the end to bring everything up. You can re-run the script idempotently - it skips work that's already done.
 
 To verify after setup:
 
@@ -1003,7 +1021,7 @@ iw dev wlan0 info         # should show ssid uav-neo-0, type AP, channel 6
 sudo iptables -L FORWARD -n | grep wlan0   # should show two REJECT rules
 ```
 
-## Logging
+## Logs
 
 Each time the teleop service starts (on boot or manual restart), a new timestamped directory is created:
 
@@ -1020,4 +1038,4 @@ Each time the teleop service starts (on boot or manual restart), a new timestamp
 └── 20260326_.../                 (previous sessions)
 ```
 
-The `~/logs/latest` symlink always points to the most recent session. Logs are not automatically cleaned up — manage disk space manually by deleting old session directories.
+The `~/logs/latest` symlink always points to the most recent session. Logs are not automatically cleaned up - manage disk space manually by deleting old session directories.

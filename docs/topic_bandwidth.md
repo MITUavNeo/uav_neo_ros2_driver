@@ -1,4 +1,4 @@
-# UAV Neo — Topic Bandwidth and I/O Reference
+# UAV Neo - Topic Bandwidth and I/O Reference
 
 Measured 2026-03-28 on Raspberry Pi 5 (8 GB) with full teleop stack running.
 Configuration: MAVROS (nice 5) + RealSense D435i 640x480@15fps + Arducam B0578 640x480@30fps capped to 20fps (patched gscam).
@@ -30,7 +30,7 @@ Configuration: MAVROS (nice 5) + RealSense D435i 640x480@15fps + Arducam B0578 6
 | mavros_node | ~86-92% | ~231 | 5 |
 | realsense2_camera_node | ~29-34% | ~129 | 0 |
 | gscam_node | ~20-25% | ~99 | 0 |
-| **Total** | **~140%** (of 400%) | **~459** | — |
+| **Total** | **~140%** (of 400%) | **~459** | - |
 
 ## Notes
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_pixhawk.sh — Configure Pi 5 UART and install MAVROS for Pixhawk communication
+# setup_pixhawk.sh - Configure Pi 5 UART and install MAVROS for Pixhawk communication
 #
 # This script:
 #   1. Removes the serial console from kernel command line
@@ -18,10 +18,10 @@
 #   MAV_1_RATE    = 0 (auto)
 #   MAV_1_MODE    = Onboard
 #
-# Wiring (TELEM2 → Pi GPIO):
-#   TELEM2 TX  → GPIO 15 (RXD)
-#   TELEM2 RX  → GPIO 14 (TXD)
-#   TELEM2 GND → GND
+# Wiring (TELEM2 -> Pi GPIO):
+#   TELEM2 TX  -> GPIO 15 (RXD)
+#   TELEM2 RX  -> GPIO 14 (TXD)
+#   TELEM2 GND -> GND
 #   Do NOT connect 5V.
 
 set -e
@@ -107,7 +107,7 @@ if [ "$CHANGES_MADE" = true ]; then
     echo "*** REBOOT REQUIRED ***"
     echo "UART/Bluetooth changes were made that require a reboot."
     echo "Run 'sudo reboot' now. After reboot:"
-    echo "  1. Connect Pixhawk TELEM2 to Pi GPIO (TX→RXD, RX→TXD, GND→GND)"
+    echo "  1. Connect Pixhawk TELEM2 to Pi GPIO (TX->RXD, RX->TXD, GND->GND)"
     echo "  2. Configure Pixhawk parameters via QGroundControl (see script header)"
     echo "  3. Verify: ros2 launch mavros px4.launch fcu_url:=/dev/ttyAMA0:921600"
 else

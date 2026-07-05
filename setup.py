@@ -1,11 +1,12 @@
 import glob
+
 from setuptools import find_packages, setup
 
 package_name = 'uav_neo_ros2_driver'
 
 setup(
     name=package_name,
-    version='1.1.0',
+    version='1.2.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -27,12 +28,13 @@ setup(
     maintainer='uav',
     maintainer_email='uav@todo.todo',
     description='ROS2 driver for UAV Neo',
-    license='TODO: License declaration',
+    license='GPL-3.0-or-later',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'edgetpu_node = uav_neo_ros2_driver.edgetpu_node:main',
             'mux_node = uav_neo_ros2_driver.mux_node:main',
+            'gamepad_node = uav_neo_ros2_driver.gamepad:main',
         ],
     },
 )

@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_all.sh — Complete UAV Neo setup: ROS2 + Pixhawk + RealSense + Arducam + Services
+# setup_all.sh - Complete UAV Neo setup: ROS2 + Pixhawk + RealSense + Arducam + Services
 #
 # This script runs each component setup in series. The Pixhawk/UART setup
 # requires a reboot before the flight controller can be connected, so this
@@ -19,7 +19,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "============================================"
-echo "  UAV Neo — Full System Setup"
+echo "  UAV Neo - Full System Setup"
 echo "============================================"
 echo ""
 
@@ -49,7 +49,7 @@ echo ""
 # Bluetooth UART is actually freed (hci0 absent = overlay active).
 NEEDS_REBOOT=false
 if hciconfig hci0 &>/dev/null; then
-    # Bluetooth is still on the UART — overlay not yet active
+    # Bluetooth is still on the UART - overlay not yet active
     NEEDS_REBOOT=true
 fi
 if grep -q "console=serial0" /proc/cmdline 2>/dev/null; then

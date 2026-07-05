@@ -21,13 +21,13 @@ mkdir -p "$LOG_DIR"
 # Atomic symlink update: create temp link then rename
 ln -sfn "$LOG_DIR" "$HOME/logs/latest"
 
-echo "=== UAV Neo Teleop — $(date) ==="
+echo "=== UAV Neo Teleop - $(date) ==="
 echo "Log directory: $LOG_DIR"
 
 # Remove FastRTPS shared-memory orphans left by processes killed mid-init
 # (e.g. timeout-killed `ros2 topic hz`). A 0-byte fastrtps_port<N> segment
 # causes any new rclpy participant that hashes to that port to spin forever
-# in _rclpy.Node() — which masquerades as a Jupyter cell hang.
+# in _rclpy.Node() - which masquerades as a Jupyter cell hang.
 for f in /dev/shm/fastrtps_port*; do
     [ -e "$f" ] || continue
     case "$f" in *_el) continue ;; esac
@@ -68,6 +68,6 @@ fi
 exec &> >(tee -a "$LOG_DIR/teleop.log")
 
 # ---------------------------------------------------------------------------
-# Launch — exec replaces this shell so systemd tracks the ros2 PID directly
+# Launch - exec replaces this shell so systemd tracks the ros2 PID directly
 # ---------------------------------------------------------------------------
 exec ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true "$@"

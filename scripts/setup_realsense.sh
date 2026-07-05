@@ -1,5 +1,5 @@
 #!/bin/bash
-# setup_realsense.sh — Install RealSense D435i ROS2 driver and Pi 5 IMU fix
+# setup_realsense.sh - Install RealSense D435i ROS2 driver and Pi 5 IMU fix
 #
 # This script:
 #   1. Installs the realsense2_camera ROS2 packages
@@ -71,7 +71,7 @@ echo "Verifying RealSense detection..."
 if command -v rs-enumerate-devices &>/dev/null; then
     rs-enumerate-devices --compact || echo "  WARNING: Camera not detected. Is it plugged in via USB 3.0?"
 else
-    echo "  rs-enumerate-devices not found — install may need 'source /opt/ros/jazzy/setup.bash'"
+    echo "  rs-enumerate-devices not found - install may need 'source /opt/ros/jazzy/setup.bash'"
 fi
 
 echo ""

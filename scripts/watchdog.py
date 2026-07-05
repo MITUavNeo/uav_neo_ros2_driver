@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
-"""UAV Neo node watchdog — monitors ROS2 nodes and restarts on failure.
+
+# Copyright 2026 MIT
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+"""UAV Neo node watchdog - monitors ROS2 nodes and restarts on failure.
 
 Watches for the MAVROS, RealSense, and Arducam nodes.  When a node
 disappears, checks whether the underlying hardware is still connected
@@ -9,14 +26,14 @@ logged to ~/logs/latest/watchdog.log.
 Designed to run as a systemd service (uav-watchdog.service).
 """
 
+from datetime import datetime
 import logging
 import os
+from pathlib import Path
 import signal
 import subprocess
 import sys
 import time
-from datetime import datetime
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -41,7 +58,7 @@ def _is_running(path_substring: str):
     """Return a process_check callable that pgreps for the given path substring.
 
     Topic-based liveness gives false positives whenever another node on the
-    same Pi subscribes to the same topic — image_relay.py keeps the camera
+    same Pi subscribes to the same topic - image_relay.py keeps the camera
     topics alive after their publishers die, MAVROS holds /mavros/state and
     /mavros/setpoint_velocity/cmd_vel. process_check closes that gap.
     """
@@ -80,13 +97,14 @@ NODES = {
         'launch': 'arducam.launch.py',
         'device_check': lambda: _usb_device_present('0c45:0578'),
         'device_label': 'USB 0c45:0578 (Arducam B0578)',
-        'restart_delay': 5,  # seconds — USB bus contention with RealSense
+        'restart_delay': 5,  # seconds - USB bus contention with RealSense
         'kill_pattern': 'gscam_node',
         'process_check': _is_running(GSCAM_EXECUTABLE_PATH),
     },
     'mux': {
         'topic': '/mavros/setpoint_velocity/cmd_vel',
-        'launch': 'mux.launch.py',  # standalone — using teleop.launch.py would re-spawn the whole stack
+        # standalone; using teleop.launch.py would re-spawn the whole stack
+        'launch': 'mux.launch.py',
         'device_check': lambda: True,  # software node, always "connected"
         'device_label': 'mux_node (software)',
         'kill_pattern': 'mux_node',
@@ -109,7 +127,7 @@ log = logging.getLogger('watchdog')
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _find_rpi_volt_alarm() -> "Path | None":
+def _find_rpi_volt_alarm() -> 'Path | None':
     """Locate the Pi 5 PMIC low-voltage sticky alarm flag.
 
     hwmon enumeration order is not stable, so resolve by the driver's `name`
@@ -132,7 +150,7 @@ def _clean_fastrtps_orphans() -> int:
 
     These appear when a rclpy process is killed mid-initialization. A new
     participant that hashes to the same port spins forever waiting for the
-    segment to grow — the fingerprint of the "Jupyter cell 3 hang".
+    segment to grow - the fingerprint of the "Jupyter cell 3 hang".
     Returns number of files removed.
     """
     shm = Path('/dev/shm')
@@ -177,7 +195,7 @@ def _get_active_topics() -> set[str]:
     Note: a topic appears here if any participant advertises OR subscribes
     to it, so MAVROS's subscription keeps /mavros/setpoint_velocity/cmd_vel
     in the list even after mux_node dies. That weakens mux-death detection
-    but is strictly safer than a publisher-count check — the rclpy graph
+    but is strictly safer than a publisher-count check - the rclpy graph
     API has subtle discovery-timing issues across node restarts that can
     produce false negatives and cascade-restart a healthy stack.
     """
@@ -233,7 +251,8 @@ def _restart_node(name: str, cfg: dict) -> None:
                 log.info('%s: sent SIGTERM to processes matching "%s"', name, kill_pat)
                 time.sleep(2)
                 # Force-kill any survivors
-                r2 = subprocess.run(['pkill', '-9', '-f', kill_pat], capture_output=True, timeout=5)
+                r2 = subprocess.run(['pkill', '-9', '-f', kill_pat],
+                                    capture_output=True, timeout=5)
                 if r2.returncode == 0:
                     log.info('%s: sent SIGKILL to surviving processes', name)
                 time.sleep(1)
@@ -250,7 +269,7 @@ def _restart_node(name: str, cfg: dict) -> None:
 
     ts = datetime.now().strftime('%H%M%S')
     restart_log = _log_dir() / f'restart_{name}_{ts}.log'
-    log.info('%s: restarting via %s — log: %s', name, cfg['launch'], restart_log)
+    log.info('%s: restarting via %s - log: %s', name, cfg['launch'], restart_log)
 
     log_fh = open(restart_log, 'w')  # noqa: SIM115
     env = os.environ.copy()
@@ -311,7 +330,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _signal_handler)
     signal.signal(signal.SIGINT, _signal_handler)
 
-    log.info('Watchdog started — monitoring: %s', ', '.join(NODES.keys()))
+    log.info('Watchdog started - monitoring: %s', ', '.join(NODES.keys()))
     log.info('Log directory: %s', logdir)
 
     volt_alarm_path = _find_rpi_volt_alarm()
@@ -359,7 +378,7 @@ def main() -> None:
         if volt_alarm_path is not None and not volt_alarm_seen:
             try:
                 if volt_alarm_path.read_text().strip() == '1':
-                    log.warning('Pi under-voltage alarm tripped — 5V rail dipped '
+                    log.warning('Pi under-voltage alarm tripped - 5V rail dipped '
                                 'below threshold (USB devices may have reset). '
                                 'Likely cause: uBEC margin too low under flight load.')
                     volt_alarm_seen = True
@@ -398,11 +417,11 @@ def main() -> None:
 
             device_ok = cfg['device_check']()
             if not device_ok:
-                log.warning('%s: %s — device %s NOT connected, skipping restart',
+                log.warning('%s: %s - device %s NOT connected, skipping restart',
                             name, failure, cfg['device_label'])
                 continue
 
-            log.warning('%s: %s — device %s connected, attempting restart',
+            log.warning('%s: %s - device %s connected, attempting restart',
                         name, failure, cfg['device_label'])
             _restart_node(name, cfg)
 

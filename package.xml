@@ -2,10 +2,10 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>uav_neo_ros2_driver</name>
-  <version>1.1.0</version>
+  <version>1.2.0</version>
   <description>ROS2 driver for UAV Neo</description>
   <maintainer email="uav@todo.todo">uav</maintainer>
-  <license>TODO: License declaration</license>
+  <license>GPL-3.0-or-later</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>

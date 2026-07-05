@@ -1,11 +1,11 @@
 # Velocity command mux configuration for UAV Neo
 #
-# The mux node arbitrates between manual (Xbox sticks) and auto (student
+# The mux node arbitrates between manual (gamepad node) and auto (student
 # code) velocity commands based on the Xbox controller's bumper state:
-#   - LB held:  manual mode — Xbox sticks control the drone
-#   - RB held:  auto mode   — student code controls the drone
-#   - Neither:  idle        — zero velocity (hover)
-#   - Both:     idle        — zero velocity (hover)
+#   - LB held:  manual mode - /gamepad/cmd_vel controls the drone
+#   - RB held:  auto mode   - student code controls the drone
+#   - Neither:  idle        - zero velocity (hover)
+#   - Both:     idle        - zero velocity (hover)
 #
 # If the Xbox controller disconnects (no /joy message for >500ms),
 # the mux publishes zero velocity regardless of the last bumper state.
@@ -13,8 +13,9 @@
 # The safety pilot on the RC transmitter always has override authority
 # at the PX4 level by switching out of OFFBOARD mode.
 #
-# Input topics:  /joy (Xbox controller), /mux/cmd_vel (student code)
-# Output topic:  /mavros/setpoint_velocity/cmd_vel (to MAVROS → Pixhawk)
+# Input topics:  /joy (bumper gating), /gamepad/cmd_vel (manual),
+#                /mux/cmd_vel (student code)
+# Output topic:  /mavros/setpoint_velocity/cmd_vel (to MAVROS -> Pixhawk)
 
 mux_node:
   ros__parameters:
@@ -26,11 +27,8 @@ mux_node:
     # Maximum yaw rate in rad/s
     max_yaw_rate: 0.5
 
-    # --- Joystick mapping ---
-
-    # Dead zone for Xbox analog sticks (applied to LX, LY, RX, RY axes)
-    # Values below this threshold are treated as zero to prevent drift
-    joystick_dead_zone: 0.15
+    # Stick normalization (dead zone) now lives in the gamepad node
+    # (config/gamepad.yaml); the mux only scales the normalized command.
 
     # --- Publishing ---
 

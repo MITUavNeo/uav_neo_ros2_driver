@@ -1,23 +1,39 @@
 #!/usr/bin/env python3
-"""UAV Neo web dashboard — real-time ROS2 node and topic monitor.
+
+# Copyright 2026 MIT
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
+"""UAV Neo web dashboard - real-time ROS2 node and topic monitor.
 
 Serves a single-page dashboard on port 8080 that displays node health,
 topic publish rates, and watchdog restart events.  Uses only Python
-stdlib (http.server, json, subprocess) — no external dependencies.
+stdlib (http.server, json, subprocess) - no external dependencies.
 
 Designed to run as a systemd service (uav-dashboard.service).
 """
 
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import logging
-import os
+from pathlib import Path
 import signal
 import subprocess
 import sys
 import threading
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -212,31 +228,56 @@ DASHBOARD_HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>UAV Neo Dashboard</title>
 <style>
-  :root { --bg: #1a1a2e; --card: #16213e; --green: #0f0; --yellow: #ff0; --red: #f44; --text: #e0e0e0; --muted: #888; }
+  :root {
+    --bg: #1a1a2e; --card: #16213e; --green: #0f0; --yellow: #ff0;
+    --red: #f44; --text: #e0e0e0; --muted: #888;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', monospace; background: var(--bg); color: var(--text); padding: 1rem; }
+  body {
+    font-family: 'Courier New', monospace; background: var(--bg);
+    color: var(--text); padding: 1rem;
+  }
   h1 { color: #7ec8e3; margin-bottom: 0.5rem; font-size: 1.4rem; }
   .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-  .card { background: var(--card); border-radius: 8px; padding: 1rem; border-left: 4px solid var(--muted); }
+  .grid {
+    display: grid; gap: 1rem; margin-bottom: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  .card {
+    background: var(--card); border-radius: 8px; padding: 1rem;
+    border-left: 4px solid var(--muted);
+  }
   .card.healthy { border-left-color: var(--green); }
   .card.stale   { border-left-color: var(--yellow); }
   .card.dead    { border-left-color: var(--red); }
   .card h2 { font-size: 1rem; margin-bottom: 0.5rem; }
-  .indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .indicator {
+    display: inline-block; width: 10px; height: 10px;
+    border-radius: 50%; margin-right: 6px;
+  }
   .indicator.healthy { background: var(--green); box-shadow: 0 0 6px var(--green); }
   .indicator.stale   { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
   .indicator.dead    { background: var(--red); box-shadow: 0 0 6px var(--red); }
   table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
-  th, td { text-align: left; padding: 0.4rem 0.8rem; border-bottom: 1px solid #2a2a4a; font-size: 0.85rem; }
+  th, td {
+    text-align: left; padding: 0.4rem 0.8rem;
+    border-bottom: 1px solid #2a2a4a; font-size: 0.85rem;
+  }
   th { color: #7ec8e3; }
   .hz { font-weight: bold; }
   .hz.ok   { color: var(--green); }
   .hz.stale { color: var(--yellow); }
   .hz.dead  { color: var(--red); }
-  .log-box { background: #0d1117; border-radius: 6px; padding: 0.8rem; font-size: 0.78rem; max-height: 200px; overflow-y: auto; white-space: pre-wrap; color: var(--muted); }
+  .log-box {
+    background: #0d1117; border-radius: 6px; padding: 0.8rem;
+    font-size: 0.78rem; max-height: 200px; overflow-y: auto;
+    white-space: pre-wrap; color: var(--muted);
+  }
   .section-title { color: #7ec8e3; font-size: 1rem; margin-bottom: 0.5rem; }
-  #error-banner { display: none; background: #4a1010; color: var(--red); padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+  #error-banner {
+    display: none; background: #4a1010; color: var(--red);
+    padding: 0.5rem 1rem; border-radius: 6px; margin-bottom: 1rem;
+  }
 </style>
 </head>
 <body>
@@ -283,16 +324,19 @@ function update() {
       // Rates
       let rh = '';
       for (const [topic, info] of Object.entries(data.rates)) {
-        const hz = info.hz !== null ? info.hz.toFixed(1) + ' Hz' : '—';
+        const hz = info.hz !== null ? info.hz.toFixed(1) + ' Hz' : '-';
         const cls = info.hz === null ? 'dead' : (info.stale ? 'stale' : 'ok');
         const label = info.hz === null ? 'NO DATA' : (info.stale ? 'STALE' : 'OK');
-        rh += `<tr><td>${topic}</td><td class="hz ${cls}">${hz}</td><td class="hz ${cls}">${label}</td></tr>`;
+        rh += `<tr><td>${topic}</td>` +
+              `<td class="hz ${cls}">${hz}</td>` +
+              `<td class="hz ${cls}">${label}</td></tr>`;
       }
       document.getElementById('rates').innerHTML = rh;
 
       // Watchdog log
       const wl = data.watchdog_log;
-      document.getElementById('watchdog-log').textContent = wl.length ? wl.join('\n') : 'No watchdog events yet.';
+      const wlEl = document.getElementById('watchdog-log');
+      wlEl.textContent = wl.length ? wl.join('\n') : 'No watchdog events yet.';
     })
     .catch(err => {
       const banner = document.getElementById('error-banner');
@@ -374,6 +418,7 @@ def main() -> None:
     log.info('Dashboard listening on http://0.0.0.0:%d', PORT)
 
     def _shutdown(signum, _frame):
+        global _monitor_running
         log.info('Received signal %d, shutting down', signum)
         _monitor_running = False
         threading.Thread(target=server.shutdown).start()
