@@ -55,9 +55,13 @@ NEEDS_REBOOT=0
 if lspci -nn 2>/dev/null | grep -qi '1ac1:089a'; then
     echo "[4/5] M.2/PCIe Coral (Apex) detected. Installing gasket driver + overlay..."
 
-    # Build prerequisites for the DKMS module.
+    # Build prerequisites for the DKMS module. linux-headers-raspi (meta) keeps
+    # headers tracking the kernel so DKMS auto-rebuilds apex after a kernel
+    # update; the explicit headers cover the current kernel immediately (needed
+    # when running from a cloned image whose kernel is already installed).
     KREL="$(uname -r)"
-    sudo apt-get install -y dkms "linux-headers-$KREL" device-tree-compiler
+    sudo apt-get install -y dkms linux-headers-raspi "linux-headers-$KREL" \
+        device-tree-compiler
 
     # gasket/apex DKMS driver. DKMS builds it for the running kernel and
     # rebuilds on kernel updates; ships its own apex udev rule (GROUP=apex).
