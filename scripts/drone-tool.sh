@@ -50,6 +50,8 @@ Launch and control:
 Hardware and system:
   udev                  reinstall udev rules + hid_nintendo blacklist
   controller            verify/fix the Xbox pad XInput mode
+  camera                test RealSense + Arducam feeds (and the 180 flip)
+  mavros                MAVROS connection + PX4 mode/arming status
   selftest              run the hardware test suite (test_hardware.py)
   status                lsusb, device nodes, ros2 node list
   setup <phase>         run setup_*.sh (all|networking|realsense|...)
@@ -75,6 +77,8 @@ drone() {
         watchdog)   _drone_stub watchdog ;;
         udev)       _drone_stub udev ;;
         controller) _drone_stub controller ;;
+        camera)     _drone_stub camera ;;
+        mavros)     _drone_stub mavros ;;
         selftest)   _drone_stub selftest ;;
         status)     _drone_stub status ;;
         setup)      _drone_stub setup ;;
@@ -88,7 +92,7 @@ drone() {
 
 _drone_complete() {
     local cmds="build test source cd teleop launch watchdog udev controller \
-selftest status setup service library cleanup help"
+camera mavros selftest status setup service library cleanup help"
     local cur="${COMP_WORDS[COMP_CWORD]}"
     if [ "$COMP_CWORD" -eq 1 ]; then
         # shellcheck disable=SC2207

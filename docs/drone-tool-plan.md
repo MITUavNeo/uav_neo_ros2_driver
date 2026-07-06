@@ -36,20 +36,20 @@ watchdog service setup library cleanup selftest status help`.
 | `selftest --dmatrix` | `selftest` | Adapt. Run the hardware suite (`test/test_hardware.py`: Pixhawk / RealSense / Arducam / Coral) instead of a dot matrix. |
 | `clear --dmatrix` | (drop) | Drop. No dot matrix display on the drone. |
 
-## New drone commands (candidates)
+## New drone commands
 
 - `controller` — verify the Xbox pad is in XInput mode (`2f24:00b7`, `js0`,
   11/8), report LED guidance, and reinstall the `hid_nintendo` blacklist if the
   pad came up as Switch-spoof (`057e:2009`).
-- `camera` — preview or confirm the RealSense 180 flip and Arducam feeds.
-- `mavros` / `px4` — MAVROS connection and PX4 mode/arming status.
+- `camera` — test the RealSense and Arducam feeds and confirm the 180 flip.
+- `mavros` — MAVROS connection and PX4 mode/arming status.
 
-## Open questions
+## Confirmed decisions
 
-- Keep `library` (student import-path switching), or is that jupyter_ws-only?
-- Add `controller` and `camera` drone commands, or keep the tool minimal?
-- Any display/indicator equivalent to the racecar dot matrix?
-- Include a `sim` command, or is the drone hardware-only?
+- `library` stays, ported from racecar-tool verbatim (adapt paths only).
+- Add `controller`, `camera`, and `mavros`.
+- Inherit only the tool; do NOT bring the pit/Teensy driver from that branch.
+- Drop the dot matrix commands and any dot-matrix test path (no such hardware).
 
 ## Scaffold contents
 
