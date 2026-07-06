@@ -1,6 +1,6 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.3.1**
+**Version: v1.4.0**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
@@ -17,6 +17,10 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - **Setup automation**: `setup_all.sh` runs six phases (ROS2 -> Pixhawk/MAVROS -> RealSense -> Arducam + gscam patch + Coral -> services -> networking) idempotently.
 
 ## Release notes
+
+### v1.4.0 (unreleased)
+
+- (in progress) Coral Edge TPU M.2 (PCIe) migration off the USB accelerator: gasket/apex DKMS modules, an `apex` udev rule for `/dev/apex_0`, and a PCIe path in `setup_coral.sh`. Replaces the USB firmware-retry workaround.
 
 ### v1.3.1 (2026-07-05)
 

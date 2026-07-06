@@ -4,6 +4,15 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - Unreleased
+
+### Added
+
+- (in progress) Coral Edge TPU M.2 (PCIe) support. Migrates the Coral path off
+  the USB accelerator: gasket/apex DKMS kernel modules, an `apex` udev rule for
+  `/dev/apex_0`, and a `setup_coral.sh` path for the PCIe card
+  (`1ac1:089a`). Replaces the USB firmware-retry workaround.
+
 ## [1.3.1] - 2026-07-05
 
 ### Fixed
