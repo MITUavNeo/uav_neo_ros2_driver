@@ -8,8 +8,10 @@ Type=exec
 User=uav
 Group=uav
 ExecStart=/bin/bash -c '\
-    LOG_DIR="$(readlink -f /home/uav/logs/latest 2>/dev/null || echo /home/uav/logs)"; \
-    mkdir -p "$LOG_DIR"; \
+    source /opt/ros/jazzy/setup.bash && \
+    source /home/uav/ros2_ws/install/setup.bash && \
+    LOG_DIR="$(readlink -f /home/uav/logs/latest 2>/dev/null || echo /home/uav/logs)" && \
+    mkdir -p "$LOG_DIR" && \
     exec /home/uav/.local/bin/jupyter lab \
         --ip=0.0.0.0 \
         --port=8888 \
@@ -21,9 +23,6 @@ ExecStart=/bin/bash -c '\
 Restart=on-failure
 RestartSec=5
 Environment=HOME=/home/uav
-Environment=PYTHONPATH=/opt/ros/jazzy/lib/python3.12/site-packages:/home/uav/ros2_ws/install/uav_neo_ros2_driver/lib/python3.12/site-packages
-Environment=AMENT_PREFIX_PATH=/home/uav/ros2_ws/install/uav_neo_ros2_driver:/opt/ros/jazzy
-Environment=LD_LIBRARY_PATH=/opt/ros/jazzy/lib/aarch64-linux-gnu:/opt/ros/jazzy/lib
 WorkingDirectory=/home/uav/jupyter_ws
 
 [Install]
