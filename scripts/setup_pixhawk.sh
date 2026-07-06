@@ -82,6 +82,21 @@ else
     echo "  bluetooth.service already disabled"
 fi
 
+# --- 4b. Pin UART0 to GPIO 14/15 (Pi 5) ---
+# On Pi 5 the GPIO-header UART is provided by RP1 and is NOT guaranteed by
+# enable_uart=1 alone. A firmware/DTB update can leave serial0 (rp1) disabled,
+# dropping /dev/ttyAMA0 entirely and silently breaking the MAVLink link (MAVROS
+# then loops on serial:open "No such file or directory"). The uart0-pi5 overlay
+# pins UART0 to GPIOs 14/15 so /dev/ttyAMA0 is always present for the Pixhawk.
+echo "[4b/6] Pinning UART0 to GPIO 14/15 (uart0-pi5)..."
+if ! grep -q "dtoverlay=uart0-pi5" "$CONFIG"; then
+    echo -e "\n# Pin UART0 to GPIO 14/15 for Pixhawk (Pi 5; survives firmware updates)\ndtoverlay=uart0-pi5" | sudo tee -a "$CONFIG" > /dev/null
+    echo "  Added uart0-pi5 overlay to $CONFIG"
+    CHANGES_MADE=true
+else
+    echo "  Already configured"
+fi
+
 # --- 5. Serial port permissions ---
 echo "[5/6] Adding $USER to dialout group..."
 if id -nG "$USER" | grep -qw dialout; then
