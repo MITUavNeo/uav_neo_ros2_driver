@@ -43,6 +43,7 @@ POLL_INTERVAL = 5            # seconds between health checks
 RESTART_COOLDOWN = 30        # minimum seconds between restarts of the same node
 STARTUP_GRACE = 15           # seconds to wait before first check (set in systemd too)
 SHM_CLEANUP_INTERVAL = 60    # seconds between FastRTPS shm orphan sweeps
+TOPIC_FAIL_THRESHOLD = 3     # consecutive topic-only misses before restart (debounce)
 
 PACKAGE = 'uav_neo_ros2_driver'
 
@@ -83,6 +84,12 @@ NODES = {
         'device_label': '/dev/ttyAMA0 (UART)',
         'kill_pattern': 'mavros_node',  # process name to pkill before restart
         'process_check': _is_running(MAVROS_EXECUTABLE_PATH),
+        # Process-authoritative: restart only when mavros_node is actually gone.
+        # MAVROS owns the FCU serial link and reconnects internally, and the
+        # `ros2 topic list` graph query drops /mavros/state intermittently
+        # (see _get_active_topics); gating restart on the topic cycles a
+        # healthy, connected MAVROS every poll.
+        'liveness': 'process',
     },
     'realsense': {
         'topic': '/camera/color/image_raw',
@@ -119,6 +126,7 @@ NODES = {
 _running = True
 _child_procs: dict[str, subprocess.Popen] = {}
 _last_restart: dict[str, float] = {}
+_topic_fail_streak: dict[str, int] = {}
 
 log = logging.getLogger('watchdog')
 
@@ -398,13 +406,20 @@ def main() -> None:
                 proc_alive = proc_check()
             else:
                 proc_alive = True
-            alive = topic_alive and proc_alive
-            failure = (
-                'topic+process down' if not topic_alive and not proc_alive else
-                'topic not advertised' if not topic_alive else
-                'process not running' if not proc_alive else
-                None
-            )
+
+            if cfg.get('liveness') == 'process':
+                # Process is authoritative (see the node's config comment). A
+                # transient topic-graph miss must not restart a running node.
+                alive = proc_alive
+                failure = None if proc_alive else 'process not running'
+            else:
+                alive = topic_alive and proc_alive
+                failure = (
+                    'topic+process down' if not topic_alive and not proc_alive else
+                    'topic not advertised' if not topic_alive else
+                    'process not running' if not proc_alive else
+                    None
+                )
 
             child = _child_procs.get(name)
             if child and child.poll() is not None:
@@ -413,7 +428,23 @@ def main() -> None:
                 _child_procs.pop(name, None)
 
             if alive:
+                _topic_fail_streak[name] = 0
                 continue
+
+            # Debounce topic-only false negatives: `ros2 topic list` drops
+            # healthy topics under DDS discovery latency (a fresh query can
+            # return a partial graph), so a single miss must not restart a node
+            # whose process is still up. Require TOPIC_FAIL_THRESHOLD consecutive
+            # misses. A dead process (failure carries 'process') is not debounced
+            # and restarts at once.
+            if proc_alive and failure == 'topic not advertised':
+                _topic_fail_streak[name] = _topic_fail_streak.get(name, 0) + 1
+                if _topic_fail_streak[name] < TOPIC_FAIL_THRESHOLD:
+                    log.info('%s: %s (%d/%d) - deferring restart',
+                             name, failure, _topic_fail_streak[name],
+                             TOPIC_FAIL_THRESHOLD)
+                    continue
+            _topic_fail_streak[name] = 0
 
             device_ok = cfg['device_check']()
             if not device_ok:

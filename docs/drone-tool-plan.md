@@ -1,0 +1,66 @@
+# drone-tool plan (v1.3.0)
+
+Plan and command reference for `drone-tool`, a `drone <subcommand>` shell helper
+for the UAV Neo kit, inherited from racecar-tool. Status: implemented in v1.3.0
+(`scripts/drone-tool.sh`). This document records the racecar -> drone carry-over
+decisions behind the command set.
+
+## Source
+
+MITRacecarNeo/racecar_neo_ros2_driver, branch `feature/pit-teensy-driver`, file
+`scripts/racecar-tool.sh` (plus `test/test_racecar_tool.py`). It is one bash
+`case` dispatch, sourced into the interactive shell as a function via `~/.bashrc`,
+with a tab-completion function. The `pit_*` files on that branch are a separate
+Teensy-driver feature and are not part of this tool.
+
+racecar-tool subcommands: `build test source cd teleop launch clear udev
+watchdog service setup library cleanup selftest status help`.
+
+## Command inheritance
+
+| racecar-tool | drone-tool | Disposition |
+|---|---|---|
+| `build` | `build` | Carry. `colcon build --packages-select uav_neo_ros2_driver` + source overlay. |
+| `test` | `test` | Carry. `colcon test` + `colcon test-result`. |
+| `source` | `source` | Carry. Source the workspace overlay. |
+| `cd` | `cd` | Carry. cd to `~/ros2_ws/src/uav_neo_ros2_driver`. |
+| `launch <name>` | `launch <name>` | Carry. `ros2 launch uav_neo_ros2_driver <name>.launch.py`. |
+| `teleop` | `teleop` | Carry. Run `scripts/launch_teleop.sh` (timestamped logs). |
+| `watchdog` | `watchdog` | Carry. Run `scripts/watchdog.py`. |
+| `service <action> [unit]` | `service <action> [unit]` | Carry. systemd for `uav-teleop`/`uav-watchdog`/`uav-dashboard`/`uav-jupyter`. |
+| `cleanup` | `cleanup` | Carry. Orphan process + FastRTPS `/dev/shm` cleanup (logic already in `watchdog.py`/`launch_teleop.sh`). |
+| `status` | `status` | Carry. `lsusb`, device nodes, `ros2 node list`. |
+| `library <action>` | `library <action>` | Carry (decision needed). Student-library import-path switching under `jupyter_ws`. |
+| `setup all\|networking\|realsense` | `setup all\|networking\|...` | Carry. Wrap `scripts/setup_*.sh`. |
+| `help` | `help` | Carry. Command reference. |
+| `udev` | `udev` | Adapt. Reinstall camera + Coral rules AND the `hid_nintendo` blacklist (`scripts/setup_controller.sh`). |
+| `selftest --dmatrix` | `selftest` | Adapt. Run the hardware suite (`test/test_hardware.py`: Pixhawk / RealSense / Arducam / Coral) instead of a dot matrix. |
+| `clear --dmatrix` | (drop) | Drop. No dot matrix display on the drone. |
+
+## New drone commands
+
+- `controller` — verify the Xbox pad is in XInput mode (`2f24:00b7`, `js0`,
+  11/8), report LED guidance, and reinstall the `hid_nintendo` blacklist if the
+  pad came up as Switch-spoof (`057e:2009`).
+- `camera` — test the RealSense and Arducam feeds and confirm the 180 flip.
+- `mavros` — MAVROS connection and PX4 mode/arming status.
+
+## Confirmed decisions
+
+- `library` stays, ported from racecar-tool verbatim (adapt paths only).
+- Add `controller`, `camera`, and `mavros`.
+- Inherit only the tool; do NOT bring the pit/Teensy driver from that branch.
+- Drop the dot matrix commands and any dot-matrix test path (no such hardware).
+
+## Deliverables
+
+- `scripts/drone-tool.sh` — the `drone()` function, the full dispatch `case`,
+  `help` text, and `_drone_complete` (subcommands, launch names, service actions,
+  setup phases, `library` flags).
+- `scripts/setup_services.sh` — sources the tool from `~/.bashrc` (idempotent).
+- This document and the README `drone-tool` section.
+
+## Installation
+
+`setup_services.sh` appends the source line to `~/.bashrc`. To enable by hand:
+`source ~/ros2_ws/src/uav_neo_ros2_driver/scripts/drone-tool.sh`.

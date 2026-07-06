@@ -4,6 +4,67 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-07-05
+
+### Fixed
+
+- Pixhawk MAVLink link on Pi 5. A firmware/DTB update left the RP1 `serial0`
+  node disabled, so `/dev/ttyAMA0` disappeared and MAVROS looped on
+  `serial:open: No such file or directory`; `/mavros/state` never published.
+  `setup_pixhawk.sh` now pins UART0 to GPIOs 14/15 with `dtoverlay=uart0-pi5`,
+  which restores `/dev/ttyAMA0` and survives future firmware updates. Requires a
+  reboot. The device path in the launch/config/test is unchanged (`/dev/ttyAMA0`).
+- Watchdog no longer restart-loops a healthy MAVROS. `mavros` liveness is now
+  process-authoritative (`liveness: 'process'` in `watchdog.py`): it restarts
+  only when `mavros_node` is actually gone, not when the `ros2 topic list` graph
+  query transiently drops `/mavros/state`. MAVROS owns the FCU serial link and
+  reconnects on its own, so the topic-based check was cycling a connected node
+  every poll once `/dev/ttyAMA0` returned.
+- Watchdog debounces topic-only failures for the topic-checked nodes
+  (`arducam`/`realsense`/`mux`). `ros2 topic list` intermittently returns a
+  partial graph under DDS discovery latency, which was restarting healthy,
+  publishing nodes ~once a minute. A restart now requires `TOPIC_FAIL_THRESHOLD`
+  (3) consecutive misses while the process is up; a dead process still restarts
+  immediately.
+- `drone mavros` no longer false-reports a connected MAVROS as down. It checks
+  `mavros_node` and `/dev/ttyAMA0` first (reliable), then reads `/mavros/state`
+  best-effort with a longer window instead of a 5s timeout that this stack's
+  discovery latency routinely exceeds.
+- `drone status` device-map comment corrected. The flight-controller UART is
+  `/dev/ttyAMA0` (GPIOs 14/15, pinned by `dtoverlay=uart0-pi5`); `/dev/ttyAMA10`
+  is the SoC PL011 on the debug connector (dead pins), not the FCU link. The
+  earlier comment had these reversed.
+
+## [1.3.0] - 2026-07-05
+
+### Added
+
+- `drone` shell helper (`scripts/drone-tool.sh`), inherited from racecar-tool: a
+  sourced `drone <subcommand>` function with tab completion. Commands: `build
+  test source cd teleop launch watchdog udev controller camera mavros selftest
+  setup service library cleanup status help`.
+- Drone-specific subcommands not in racecar-tool: `controller` (verify the Xbox
+  pad is in XInput mode `2f24:00b7`; reinstall the `hid_nintendo` blacklist if it
+  came up as the Switch spoof `057e:2009`), `camera` (RealSense + Arducam
+  hardware tests plus a pointer to confirm the 180 flip), and `mavros` (MAVROS
+  link + PX4 state from `/mavros/state`).
+- `setup_services.sh` sources `drone-tool.sh` from `~/.bashrc` (idempotent), so
+  `drone` is available after setup.
+- `docs/drone-tool-plan.md`: the racecar -> drone command mapping and carry-over
+  decisions.
+
+### Changed
+
+- `selftest` runs the hardware suite (`test/test_hardware.py`) instead of
+  racecar's dot matrix patterns; `udev` reinstalls the camera + Coral rules AND
+  the `hid_nintendo` blacklist; `library` manages `drone_student.pth` pointing at
+  `~/jupyter_ws/<folder>/library/drone_core.py`.
+
+### Removed
+
+- Racecar-only features were not carried over: the dot matrix `clear`/`selftest`
+  paths, the Teensy/pit driver, and motor/ESC/lidar/ackermann controls.
+
 ## [1.2.0] - 2026-07-05
 
 ### Added

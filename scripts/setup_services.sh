@@ -157,7 +157,25 @@ for svc in "${SERVICES[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 7. Summary
+# 7. Install the `drone` shell helper
+# ---------------------------------------------------------------------------
+echo ""
+echo "--- Installing drone-tool shell helper ---"
+
+DRONE_TOOL="$SCRIPT_DIR/drone-tool.sh"
+if grep -q 'drone-tool.sh' "$HOME/.bashrc" 2>/dev/null; then
+    echo "drone-tool: already sourced from ~/.bashrc"
+else
+    {
+        echo ""
+        echo "# UAV Neo drone-tool"
+        echo "source \"$DRONE_TOOL\""
+    } >> "$HOME/.bashrc"
+    echo "drone-tool: added source line to ~/.bashrc (open a new shell or 'source ~/.bashrc')"
+fi
+
+# ---------------------------------------------------------------------------
+# 8. Summary
 # ---------------------------------------------------------------------------
 echo ""
 echo "============================================="
