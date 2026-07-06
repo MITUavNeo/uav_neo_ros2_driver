@@ -83,6 +83,12 @@ NODES = {
         'device_label': '/dev/ttyAMA0 (UART)',
         'kill_pattern': 'mavros_node',  # process name to pkill before restart
         'process_check': _is_running(MAVROS_EXECUTABLE_PATH),
+        # Process-authoritative: restart only when mavros_node is actually gone.
+        # MAVROS owns the FCU serial link and reconnects internally, and the
+        # `ros2 topic list` graph query drops /mavros/state intermittently
+        # (see _get_active_topics); gating restart on the topic cycles a
+        # healthy, connected MAVROS every poll.
+        'liveness': 'process',
     },
     'realsense': {
         'topic': '/camera/color/image_raw',
@@ -398,13 +404,20 @@ def main() -> None:
                 proc_alive = proc_check()
             else:
                 proc_alive = True
-            alive = topic_alive and proc_alive
-            failure = (
-                'topic+process down' if not topic_alive and not proc_alive else
-                'topic not advertised' if not topic_alive else
-                'process not running' if not proc_alive else
-                None
-            )
+
+            if cfg.get('liveness') == 'process':
+                # Process is authoritative (see the node's config comment). A
+                # transient topic-graph miss must not restart a running node.
+                alive = proc_alive
+                failure = None if proc_alive else 'process not running'
+            else:
+                alive = topic_alive and proc_alive
+                failure = (
+                    'topic+process down' if not topic_alive and not proc_alive else
+                    'topic not advertised' if not topic_alive else
+                    'process not running' if not proc_alive else
+                    None
+                )
 
             child = _child_procs.get(name)
             if child and child.poll() is not None:

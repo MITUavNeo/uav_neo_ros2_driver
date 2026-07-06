@@ -4,6 +4,23 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-07-05
+
+### Fixed
+
+- Pixhawk MAVLink link on Pi 5. A firmware/DTB update left the RP1 `serial0`
+  node disabled, so `/dev/ttyAMA0` disappeared and MAVROS looped on
+  `serial:open: No such file or directory`; `/mavros/state` never published.
+  `setup_pixhawk.sh` now pins UART0 to GPIOs 14/15 with `dtoverlay=uart0-pi5`,
+  which restores `/dev/ttyAMA0` and survives future firmware updates. Requires a
+  reboot. The device path in the launch/config/test is unchanged (`/dev/ttyAMA0`).
+- Watchdog no longer restart-loops a healthy MAVROS. `mavros` liveness is now
+  process-authoritative (`liveness: 'process'` in `watchdog.py`): it restarts
+  only when `mavros_node` is actually gone, not when the `ros2 topic list` graph
+  query transiently drops `/mavros/state`. MAVROS owns the FCU serial link and
+  reconnects on its own, so the topic-based check was cycling a connected node
+  every poll once `/dev/ttyAMA0` returned.
+
 ## [1.3.0] - 2026-07-05
 
 ### Added
