@@ -1,6 +1,6 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.4.0**
+**Version: v1.4.1**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
@@ -17,6 +17,10 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - **Setup automation**: `setup_all.sh` runs six phases (ROS2 -> Pixhawk/MAVROS -> RealSense -> Arducam + gscam patch + Coral -> services -> networking) idempotently.
 
 ## Release notes
+
+### v1.4.1 (2026-07-06)
+
+- Fixed JupyterLab failing to import `uav_neo_ros2_driver` (`ModuleNotFoundError`) after a `--symlink-install` build: `uav-jupyter.service` now sources the ROS 2 and workspace overlays instead of relying on a static `PYTHONPATH`, which cannot resolve the develop egg-link.
 
 ### v1.4.0 (2026-07-06)
 

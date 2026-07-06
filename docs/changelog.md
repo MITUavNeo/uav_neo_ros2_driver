@@ -4,6 +4,17 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-07-06
+
+### Fixed
+
+- JupyterLab could not import `uav_neo_ros2_driver` (e.g. the student library's
+  `controller_real.py`), failing with `ModuleNotFoundError`. `uav-jupyter.service`
+  set a static `PYTHONPATH`, which does not resolve the develop egg-link that a
+  `--symlink-install` build writes into the overlay. The service now sources the
+  ROS 2 and workspace overlays (matching `uav-dashboard.service`), so the driver
+  package is importable regardless of copy vs symlink install.
+
 ## [1.4.0] - 2026-07-06
 
 ### Added
