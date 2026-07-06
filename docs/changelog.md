@@ -4,7 +4,7 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] - Unreleased
+## [1.4.0] - 2026-07-06
 
 ### Added
 
@@ -13,11 +13,18 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`depend/gasket-dkms_*.deb`), the `coral-msi` device-tree overlay
   (`scripts/coral-msi.dts`), and the `apex` access group for non-root
   `/dev/apex_0`. `edgetpu_node` uses the M.2 with no code change (it auto-detects
-  `pci` at `/dev/apex_0`). See `docs/coral-m2-migration.md`.
+  `pci` at `/dev/apex_0`). Deployed and verified on uav-neo. See
+  `docs/coral-m2-migration.md`.
 - `coral-msi` device-tree overlay. Repoints the Pi 5 external PCIe `msi-parent`
   from the small `mip1` peripheral to `pcie1`'s own MSI controller, which has
   enough vectors for the Apex's 13 interrupts. Without it apex fails with
-  `Couldn't initialize interrupts: -28`.
+  `Couldn't initialize interrupts: -28`. The overlay resolves `pcie1` by symbol,
+  so it applies on any Pi 5 without per-board edits (portable to cloned images).
+- Kernel-update resilience for the M.2 driver. `setup_coral.sh` installs the
+  `linux-headers-raspi` meta package so DKMS auto-rebuilds `apex`/`gasket` after
+  a kernel update. `setup_coral.sh` is idempotent and safe to re-run; all M.2
+  state (overlay, DKMS module, udev rule, group) lives on disk, so a cloned
+  image detects the Coral the same on another Pi 5.
 
 ### Changed
 

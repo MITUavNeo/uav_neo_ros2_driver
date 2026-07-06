@@ -70,8 +70,10 @@ python3 -c "from pycoral.utils.edgetpu import list_edge_tpus; print(list_edge_tp
 
 ## Racecar-neo port
 
-racecar-neo is the same Pi 5 / BCM2712, so the recipe transfers directly. Copy
-these into the racecar driver repo and run its `setup_coral.sh` equivalent:
+Status: TODO. uav-neo is done and deployed; racecar-neo has not been migrated
+yet (its repo lives separately). racecar-neo is the same Pi 5 / BCM2712, so the
+recipe transfers directly. Copy these into the racecar driver repo and run its
+`setup_coral.sh` equivalent:
 
 - `depend/gasket-dkms_*.deb`
 - `scripts/coral-msi.dts` and `scripts/gasket-msi-fallback.patch`

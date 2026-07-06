@@ -18,10 +18,11 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 
 ## Release notes
 
-### v1.4.0 (unreleased)
+### v1.4.0 (2026-07-06)
 
-- Coral Edge TPU M.2 (PCIe) support. `setup_coral.sh` auto-detects the Apex card and installs the gasket/apex DKMS driver, the `coral-msi` device-tree overlay, and the `apex` access group; `edgetpu_node` uses `/dev/apex_0` with no code change. See [docs/coral-m2-migration.md](docs/coral-m2-migration.md).
+- Coral Edge TPU M.2 (PCIe) support. `setup_coral.sh` auto-detects the Apex card and installs the gasket/apex DKMS driver, the `coral-msi` device-tree overlay, and the `apex` access group; `edgetpu_node` uses `/dev/apex_0` with no code change. Deployed and verified on uav-neo. See [docs/coral-m2-migration.md](docs/coral-m2-migration.md).
 - Added the `coral-msi` overlay that repoints the Pi 5 external PCIe `msi-parent` to `pcie1`, fixing the `apex ... Couldn't initialize interrupts: -28` failure (the default `mip1` MSI controller lacks enough vectors for the Apex's 13, shared with the NVMe).
+- Made the M.2 setup reproducible across machines: idempotent `setup_coral.sh`, a symbol-resolved overlay, and the `linux-headers-raspi` meta so DKMS survives kernel updates. A cloned image detects the Coral the same on another Pi 5.
 - Removed the USB firmware-retry workaround in `edgetpu_node.py` and cut the EdgeTPU launch delay from 10s to 3s (both were USB-accelerator specific).
 
 ### v1.3.1 (2026-07-05)
