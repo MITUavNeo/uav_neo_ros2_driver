@@ -542,9 +542,10 @@ __DR_CLEANUP_HELP__
                 || echo "  (none of the expected USB devices found)"
             echo
             echo "=== Device nodes ==="
-            # Pixhawk UART: Pi 5 enumerates the primary UART as /dev/ttyAMA10
-            # (RP1); older configs reference /dev/ttyAMA0. Report whichever the
-            # kernel presents.
+            # Pixhawk UART: the FC is on GPIO 14/15 = RP1 serial0 = /dev/ttyAMA0
+            # (pinned by dtoverlay=uart0-pi5; see setup_pixhawk.sh). /dev/ttyAMA10
+            # is the SoC PL011 on the debug connector (dead pins), not the FCU
+            # link. List whichever the kernel presents.
             local uart
             uart=$(ls /dev/ttyAMA* 2>/dev/null | tr '\n' ' ')
             if [[ -n "$uart" ]]; then
