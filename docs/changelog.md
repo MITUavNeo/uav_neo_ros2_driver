@@ -20,6 +20,16 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   query transiently drops `/mavros/state`. MAVROS owns the FCU serial link and
   reconnects on its own, so the topic-based check was cycling a connected node
   every poll once `/dev/ttyAMA0` returned.
+- Watchdog debounces topic-only failures for the topic-checked nodes
+  (`arducam`/`realsense`/`mux`). `ros2 topic list` intermittently returns a
+  partial graph under DDS discovery latency, which was restarting healthy,
+  publishing nodes ~once a minute. A restart now requires `TOPIC_FAIL_THRESHOLD`
+  (3) consecutive misses while the process is up; a dead process still restarts
+  immediately.
+- `drone mavros` no longer false-reports a connected MAVROS as down. It checks
+  `mavros_node` and `/dev/ttyAMA0` first (reliable), then reads `/mavros/state`
+  best-effort with a longer window instead of a 5s timeout that this stack's
+  discovery latency routinely exceeds.
 
 ## [1.3.0] - 2026-07-05
 

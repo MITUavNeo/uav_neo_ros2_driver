@@ -146,16 +146,37 @@ drone() {
             ;;
 
         mavros)
-            # MAVROS link + PX4 mode/arming state from /mavros/state.
-            if ! command -v ros2 >/dev/null; then
-                echo "drone mavros: ros2 not on PATH (run 'drone source' first)" >&2
-                return 1
-            fi
-            echo "=== MAVROS / PX4 state (/mavros/state) ==="
-            if ! timeout 5 ros2 topic echo /mavros/state --once 2>/dev/null; then
-                echo "  No /mavros/state within 5s." >&2
-                echo "  Is the mavros node running? Try: drone launch mavros" >&2
+            # mavros_node running + /dev/ttyAMA0 present is the reliable liveness
+            # signal. The /mavros/state read is best-effort: ros2 topic discovery
+            # on this stack routinely takes >5s, so a short timeout false-reports
+            # a healthy, connected MAVROS as down.
+            echo "=== MAVROS ==="
+            local mpid
+            mpid=$(pgrep -x mavros_node | head -1)
+            if [ -n "$mpid" ]; then
+                echo "  mavros_node: running (pid $mpid)"
+            else
+                echo "  mavros_node: not running - start the stack with 'drone teleop'" >&2
                 return 3
+            fi
+            if [ -e /dev/ttyAMA0 ]; then
+                echo "  /dev/ttyAMA0: present"
+            else
+                echo "  /dev/ttyAMA0: MISSING - needs dtoverlay=uart0-pi5 (drone setup pixhawk)" >&2
+            fi
+            if ! command -v ros2 >/dev/null; then
+                return 0
+            fi
+            echo "  reading /mavros/state (discovery can take ~10s) ..."
+            local state
+            state=$(timeout 15 ros2 topic echo /mavros/state --once 2>/dev/null)
+            if [ -n "$state" ]; then
+                echo "$state" | grep -E 'connected|armed|guided|mode|system_status' \
+                    | sed 's/^/  /'
+            else
+                echo "  /mavros/state not read in 15s (ros2 discovery latency)."
+                echo "  mavros_node is up with the serial link; retry, or check the FCU link:"
+                echo "    journalctl -u uav-teleop -b | grep 'CON:'"
             fi
             ;;
 

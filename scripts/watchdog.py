@@ -43,6 +43,7 @@ POLL_INTERVAL = 5            # seconds between health checks
 RESTART_COOLDOWN = 30        # minimum seconds between restarts of the same node
 STARTUP_GRACE = 15           # seconds to wait before first check (set in systemd too)
 SHM_CLEANUP_INTERVAL = 60    # seconds between FastRTPS shm orphan sweeps
+TOPIC_FAIL_THRESHOLD = 3     # consecutive topic-only misses before restart (debounce)
 
 PACKAGE = 'uav_neo_ros2_driver'
 
@@ -125,6 +126,7 @@ NODES = {
 _running = True
 _child_procs: dict[str, subprocess.Popen] = {}
 _last_restart: dict[str, float] = {}
+_topic_fail_streak: dict[str, int] = {}
 
 log = logging.getLogger('watchdog')
 
@@ -426,7 +428,23 @@ def main() -> None:
                 _child_procs.pop(name, None)
 
             if alive:
+                _topic_fail_streak[name] = 0
                 continue
+
+            # Debounce topic-only false negatives: `ros2 topic list` drops
+            # healthy topics under DDS discovery latency (a fresh query can
+            # return a partial graph), so a single miss must not restart a node
+            # whose process is still up. Require TOPIC_FAIL_THRESHOLD consecutive
+            # misses. A dead process (failure carries 'process') is not debounced
+            # and restarts at once.
+            if proc_alive and failure == 'topic not advertised':
+                _topic_fail_streak[name] = _topic_fail_streak.get(name, 0) + 1
+                if _topic_fail_streak[name] < TOPIC_FAIL_THRESHOLD:
+                    log.info('%s: %s (%d/%d) - deferring restart',
+                             name, failure, _topic_fail_streak[name],
+                             TOPIC_FAIL_THRESHOLD)
+                    continue
+            _topic_fail_streak[name] = 0
 
             device_ok = cfg['device_check']()
             if not device_ok:
