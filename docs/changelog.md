@@ -4,6 +4,43 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-06
+
+### Added
+
+- Coral Edge TPU M.2 (PCIe) support. `setup_coral.sh` auto-detects the Apex card
+  (`1ac1:089a`) and installs the full PCIe path: the gasket/apex driver via DKMS
+  (`depend/gasket-dkms_*.deb`), the `coral-msi` device-tree overlay
+  (`scripts/coral-msi.dts`), and the `apex` access group for non-root
+  `/dev/apex_0`. `edgetpu_node` uses the M.2 with no code change (it auto-detects
+  `pci` at `/dev/apex_0`). Deployed and verified on uav-neo. See
+  `docs/coral-m2-migration.md`.
+- `coral-msi` device-tree overlay. Repoints the Pi 5 external PCIe `msi-parent`
+  from the small `mip1` peripheral to `pcie1`'s own MSI controller, which has
+  enough vectors for the Apex's 13 interrupts. Without it apex fails with
+  `Couldn't initialize interrupts: -28`. The overlay resolves `pcie1` by symbol,
+  so it applies on any Pi 5 without per-board edits (portable to cloned images).
+- Kernel-update resilience for the M.2 driver. `setup_coral.sh` installs the
+  `linux-headers-raspi` meta package so DKMS auto-rebuilds `apex`/`gasket` after
+  a kernel update. `setup_coral.sh` is idempotent and safe to re-run; all M.2
+  state (overlay, DKMS module, udev rule, group) lives on disk, so a cloned
+  image detects the Coral the same on another Pi 5.
+
+### Changed
+
+- gasket/apex driver is the feranick fork (builds on kernel 6.8 arm64) plus
+  `scripts/gasket-msi-fallback.patch`, which allocates interrupts with
+  `pci_alloc_irq_vectors(MSI-X | MSI)` so it falls back to MSI on the Pi 5 (whose
+  external PCIe controller supplies MSI, not MSI-X).
+- `teleop.launch.py` EdgeTPU start delay cut from 10s to 3s: the M.2 Apex is
+  bound at boot, so the old USB-firmware-enumeration wait is unneeded.
+
+### Removed
+
+- USB firmware-retry workaround in `edgetpu_node.py` (the one-shot
+  `make_interpreter` retry for the USB accelerator's `1a6e:089a -> 18d1:9302`
+  re-enumeration). The M.2 Apex loads on the first try.
+
 ## [1.3.1] - 2026-07-05
 
 ### Fixed

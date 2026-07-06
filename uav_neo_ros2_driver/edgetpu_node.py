@@ -98,16 +98,7 @@ class EdgeTPUNode(Node):
             f'EdgeTPU found: {tpus[0]["type"]} at {tpus[0]["path"]}'
         )
 
-        # First load_delegate after boot triggers the Coral firmware load
-        # (1a6e:089a -> 18d1:9302) but always fails. Retry once.
-        try:
-            self.interpreter = make_interpreter(model_path)
-        except ValueError:
-            self.get_logger().warn(
-                'First load_delegate failed (likely Coral firmware load); retrying in 1.5s'
-            )
-            time.sleep(1.5)
-            self.interpreter = make_interpreter(model_path)
+        self.interpreter = make_interpreter(model_path)
         self.interpreter.allocate_tensors()
 
         self.input_details = self.interpreter.get_input_details()[0]

@@ -122,10 +122,11 @@ def generate_launch_description():
         default_value=os.path.join(pkg_dir, 'config', 'edgetpu.yaml'),
         description='Path to EdgeTPU config YAML')
 
-    # Include EdgeTPU launch (delayed 10s to let Coral USB firmware enumeration
-    # and udev settle after boot - load_delegate fails if it runs too early).
+    # Include EdgeTPU launch (short stagger so the camera topics are up before
+    # edgetpu_node subscribes). The M.2 Apex is bound at boot, so the old 10s
+    # USB-firmware-enumeration wait is no longer needed.
     edgetpu_launch = TimerAction(
-        period=10.0,
+        period=3.0,
         actions=[
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
