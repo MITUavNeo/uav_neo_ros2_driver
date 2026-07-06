@@ -1,6 +1,6 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.2.0**
+**Version: v1.3.0**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
@@ -17,6 +17,13 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - **Setup automation**: `setup_all.sh` runs six phases (ROS2 -> Pixhawk/MAVROS -> RealSense -> Arducam + gscam patch + Coral -> services -> networking) idempotently.
 
 ## Release notes
+
+### v1.3.0 (2026-07-05)
+
+- Added the `drone` developer helper (`scripts/drone-tool.sh`), inherited from racecar-tool: a sourced `drone <subcommand>` shell function with tab completion for build/test/launch/service/library management and hardware checks. See [drone-tool](#drone-tool).
+- New drone-only subcommands: `controller` (confirm the pad is in XInput mode and reinstall the `hid_nintendo` blacklist if it came up as the Switch spoof), `camera` (RealSense + Arducam hardware tests plus a pointer to confirm the 180 flip), and `mavros` (MAVROS link + PX4 state).
+- `selftest` runs the hardware suite; `udev` reinstalls the camera + Coral rules and the controller blacklist; `library` manages `drone_student.pth` for the student library import path. `setup_services.sh` sources the tool from `~/.bashrc` so `drone` is available after setup.
+- Not carried over from racecar-tool: the dot matrix commands, the Teensy/pit driver, and motor/ESC/lidar/ackermann controls.
 
 ### v1.2.0 (2026-07-05)
 
@@ -79,6 +86,7 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - [Peripheral verification](#peripheral-verification)
 - [Package build](#package-build)
 - [Tests](#tests)
+- [drone-tool](#drone-tool)
 - [Launch commands](#launch-commands)
   - [MAVROS](#mavros)
   - [RealSense D435i](#realsense-d435i)
@@ -689,6 +697,36 @@ Each test assertion includes a human-readable error message with the exact comma
 colcon test --packages-select uav_neo_ros2_driver
 colcon test-result --verbose
 ```
+
+## drone-tool
+
+`scripts/drone-tool.sh` defines a `drone <subcommand>` shell function (inherited from racecar-tool) that wraps the common build, launch, service, and hardware-check commands. It is sourced, not executed, so `drone cd`, `drone source`, and `drone build` mutate the current shell. `setup_services.sh` adds the source line to `~/.bashrc`; to enable it by hand:
+
+```bash
+source ~/ros2_ws/src/uav_neo_ros2_driver/scripts/drone-tool.sh
+```
+
+Tab completion covers subcommands, launch-file names, service actions, setup phases, and `library` flags.
+
+| Command | Action |
+|---|---|
+| `drone build` | `colcon build --packages-select uav_neo_ros2_driver --symlink-install` and source the overlay. |
+| `drone test` | Run the package test suite with verbose results. |
+| `drone source` / `drone cd` | Source the overlay / cd to the package root in the current shell. |
+| `drone teleop` | Launch the full stack via `launch_teleop.sh` (timestamped logs + SHM sweep). |
+| `drone launch <name>` | `ros2 launch uav_neo_ros2_driver <name>.launch.py` (completes `arducam`, `edgetpu`, `mavros`, `mux`, `realsense`, `teleop`). |
+| `drone watchdog` | Run the node watchdog in the foreground. |
+| `drone udev` | Reinstall the camera + Coral udev rules and the `hid_nintendo` blacklist. |
+| `drone controller` | Confirm the Xbox pad is in XInput mode (`2f24:00b7`, `js0`, 11/8); reinstall the blacklist if it came up as the Switch spoof (`057e:2009`). |
+| `drone camera` | Run the RealSense + Arducam hardware tests and point to the live 180-flip check. |
+| `drone mavros` | Show the MAVROS link + PX4 mode/arming state from `/mavros/state`. |
+| `drone selftest` | Run the full hardware suite (Pixhawk / RealSense / Arducam / Coral + deps). |
+| `drone setup <phase>` | Run a setup script: `all`, `pixhawk`, `realsense`, `arducam`, `coral`, `services`, `networking`, `controller`. |
+| `drone service <action> [unit]` | systemd control for `uav-teleop`/`uav-watchdog`/`uav-dashboard`/`uav-jupyter`. |
+| `drone library <action>` | Manage `drone_student.pth`: `--select <folder>`, `--list`, `--reset`, `--status`. |
+| `drone cleanup` | List orphaned drone processes + FastRTPS SHM segments (dry-run; `--force` to remove). |
+| `drone status` | USB peripherals, device nodes, and running ros2 nodes. |
+| `drone help` | Command reference. |
 
 ## Launch commands
 

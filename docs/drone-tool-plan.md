@@ -1,8 +1,9 @@
 # drone-tool plan (v1.3.0)
 
-Plan for `drone-tool`, a `drone <subcommand>` shell helper for the UAV Neo kit,
-inherited from racecar-tool. Status: scaffold only; commands are stubs pending a
-decision on which racecar features to carry over.
+Plan and command reference for `drone-tool`, a `drone <subcommand>` shell helper
+for the UAV Neo kit, inherited from racecar-tool. Status: implemented in v1.3.0
+(`scripts/drone-tool.sh`). This document records the racecar -> drone carry-over
+decisions behind the command set.
 
 ## Source
 
@@ -51,14 +52,15 @@ watchdog service setup library cleanup selftest status help`.
 - Inherit only the tool; do NOT bring the pit/Teensy driver from that branch.
 - Drop the dot matrix commands and any dot-matrix test path (no such hardware).
 
-## Scaffold contents
+## Deliverables
 
-- `scripts/drone-tool.sh` — the `drone()` function, dispatch `case` with stubbed
-  branches, `help` text, and a `_drone_complete` skeleton. No command bodies yet.
-- This plan.
+- `scripts/drone-tool.sh` — the `drone()` function, the full dispatch `case`,
+  `help` text, and `_drone_complete` (subcommands, launch names, service actions,
+  setup phases, `library` flags).
+- `scripts/setup_services.sh` — sources the tool from `~/.bashrc` (idempotent).
+- This document and the README `drone-tool` section.
 
-## Installation (planned)
+## Installation
 
-Source it from `~/.bashrc` (`source ~/ros2_ws/src/uav_neo_ros2_driver/scripts/drone-tool.sh`),
-matching how racecar-tool is installed. `scripts/setup_services.sh` would add the
-line during setup once implemented.
+`setup_services.sh` appends the source line to `~/.bashrc`. To enable by hand:
+`source ~/ros2_ws/src/uav_neo_ros2_driver/scripts/drone-tool.sh`.

@@ -4,6 +4,36 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-05
+
+### Added
+
+- `drone` shell helper (`scripts/drone-tool.sh`), inherited from racecar-tool: a
+  sourced `drone <subcommand>` function with tab completion. Commands: `build
+  test source cd teleop launch watchdog udev controller camera mavros selftest
+  setup service library cleanup status help`.
+- Drone-specific subcommands not in racecar-tool: `controller` (verify the Xbox
+  pad is in XInput mode `2f24:00b7`; reinstall the `hid_nintendo` blacklist if it
+  came up as the Switch spoof `057e:2009`), `camera` (RealSense + Arducam
+  hardware tests plus a pointer to confirm the 180 flip), and `mavros` (MAVROS
+  link + PX4 state from `/mavros/state`).
+- `setup_services.sh` sources `drone-tool.sh` from `~/.bashrc` (idempotent), so
+  `drone` is available after setup.
+- `docs/drone-tool-plan.md`: the racecar -> drone command mapping and carry-over
+  decisions.
+
+### Changed
+
+- `selftest` runs the hardware suite (`test/test_hardware.py`) instead of
+  racecar's dot matrix patterns; `udev` reinstalls the camera + Coral rules AND
+  the `hid_nintendo` blacklist; `library` manages `drone_student.pth` pointing at
+  `~/jupyter_ws/<folder>/library/drone_core.py`.
+
+### Removed
+
+- Racecar-only features were not carried over: the dot matrix `clear`/`selftest`
+  paths, the Teensy/pit driver, and motor/ESC/lidar/ackermann controls.
+
 ## [1.2.0] - 2026-07-05
 
 ### Added
