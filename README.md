@@ -22,6 +22,7 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 
 - Fixed the Pixhawk MAVLink link on Pi 5. A firmware/DTB update disabled the RP1 `serial0` node, so `/dev/ttyAMA0` disappeared and MAVROS looped on `serial:open: No such file or directory`. `setup_pixhawk.sh` now pins UART0 to GPIOs 14/15 with `dtoverlay=uart0-pi5`, restoring `/dev/ttyAMA0` (reboot required). On Pi 5 the GPIO-header UART is not guaranteed by `enable_uart=1` alone; this overlay makes it durable across firmware updates.
 - Watchdog no longer restart-loops a healthy MAVROS: `mavros` liveness is now process-authoritative, so a transient `ros2 topic list` miss of `/mavros/state` no longer cycles a connected node.
+- Corrected the `drone status` device-map note: the flight-controller UART is `/dev/ttyAMA0` (GPIOs 14/15, pinned by `dtoverlay=uart0-pi5`); `/dev/ttyAMA10` is the debug-connector PL011 (dead pins), not the FCU link.
 
 ### v1.3.0 (2026-07-05)
 

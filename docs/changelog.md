@@ -30,6 +30,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `mavros_node` and `/dev/ttyAMA0` first (reliable), then reads `/mavros/state`
   best-effort with a longer window instead of a 5s timeout that this stack's
   discovery latency routinely exceeds.
+- `drone status` device-map comment corrected. The flight-controller UART is
+  `/dev/ttyAMA0` (GPIOs 14/15, pinned by `dtoverlay=uart0-pi5`); `/dev/ttyAMA10`
+  is the SoC PL011 on the debug connector (dead pins), not the FCU link. The
+  earlier comment had these reversed.
 
 ## [1.3.0] - 2026-07-05
 
