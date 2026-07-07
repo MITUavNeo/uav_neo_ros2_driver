@@ -4,6 +4,29 @@ All notable changes to this package are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] - 2026-07-06
+
+### Added
+
+- `scripts/reset_networking.sh` and the `drone setup networking --reset` flag,
+  which revert the networking config to stock for imaging or porting a unit to a
+  new machine. The script deletes the `uav-neo-ap` connection (removing the SSID
+  and plaintext WPA2 PSK), deletes `netplan-eth0` and `99-uav-eth0.yaml` so eth0
+  returns to plain DHCP with no static IP or MAC lock, removes the AP-isolation
+  dispatcher, flushes the wlan0 FORWARD rules, and runs `netplan apply`. It is
+  idempotent, touches only what `setup_networking.sh` created, and takes `--yes`
+  to skip the connectivity-loss prompt for scripted runs.
+
+### Fixed
+
+- Closed a networking leak in cloned images. On this build NetworkManager stores
+  connections in netplan (`/etc/netplan/90-NM-<uuid>.yaml`), not in
+  `/etc/NetworkManager/system-connections/`, so a per-unit `.nmconnection` wipe
+  left the AP PSK, the static `192.168.52.200`, and the eth0 MAC lock in the
+  image. `reset_networking.sh` removes them via `nmcli`, which keeps the netplan
+  store consistent. `pre-image-wipe.sh` now documents the reset as the pre-imaging
+  networking step.
+
 ## [1.4.1] - 2026-07-06
 
 ### Fixed

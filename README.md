@@ -1,6 +1,6 @@
 # UAV Neo ROS2 Driver
 
-**Version: v1.4.1**
+**Version: v1.4.2**
 
 A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone kit built on a Raspberry Pi 5 mission computer running Ubuntu 24.04 (Noble).
 
@@ -17,6 +17,11 @@ A ROS2 (Jazzy) driver package for **UAV Neo**, an educational autonomous drone k
 - **Setup automation**: `setup_all.sh` runs six phases (ROS2 -> Pixhawk/MAVROS -> RealSense -> Arducam + gscam patch + Coral -> services -> networking) idempotently.
 
 ## Release notes
+
+### v1.4.2 (2026-07-06)
+
+- Added `scripts/reset_networking.sh` and `drone setup networking --reset` to revert networking to stock: it deletes the `uav-neo-ap` connection (removing the SSID and plaintext WPA2 PSK), drops the eth0 static IP and MAC lock back to plain DHCP, removes the AP-isolation dispatcher, and flushes the wlan0 FORWARD rules. Idempotent; a stock system reports no changes.
+- Reset closes an imaging leak: NetworkManager stores connections in netplan (`/etc/netplan/90-NM-<uuid>.yaml`) on this build, not in `system-connections/`, so `pre-image-wipe.sh`'s per-unit connection wipe alone left the AP PSK and static IP in the image. Run `drone setup networking --reset` before cloning; the wipe script now documents this as the pre-imaging step.
 
 ### v1.4.1 (2026-07-06)
 
@@ -738,7 +743,7 @@ Tab completion covers subcommands, launch-file names, service actions, setup pha
 | `drone camera` | Run the RealSense + Arducam hardware tests and point to the live 180-flip check. |
 | `drone mavros` | Show the MAVROS link + PX4 mode/arming state from `/mavros/state`. |
 | `drone selftest` | Run the full hardware suite (Pixhawk / RealSense / Arducam / Coral + deps). |
-| `drone setup <phase>` | Run a setup script: `all`, `pixhawk`, `realsense`, `arducam`, `coral`, `services`, `networking`, `controller`. |
+| `drone setup <phase>` | Run a setup script: `all`, `pixhawk`, `realsense`, `arducam`, `coral`, `services`, `networking`, `controller`. `networking --reset` reverts networking to stock (pre-imaging). |
 | `drone service <action> [unit]` | systemd control for `uav-teleop`/`uav-watchdog`/`uav-dashboard`/`uav-jupyter`. |
 | `drone library <action>` | Manage `drone_student.pth`: `--select <folder>`, `--list`, `--reset`, `--status`. |
 | `drone cleanup` | List orphaned drone processes + FastRTPS SHM segments (dry-run; `--force` to remove). |
@@ -1075,6 +1080,19 @@ ip -br addr show eth0     # should show 192.168.52.200/24 + DHCP address
 iw dev wlan0 info         # should show ssid uav-neo-0, type AP, channel 6
 sudo iptables -L FORWARD -n | grep wlan0   # should show two REJECT rules
 ```
+
+### Reset
+
+`scripts/reset_networking.sh` (or `drone setup networking --reset`) reverts the config to stock, which is the step to run before cloning a unit's disk to a new machine:
+
+```bash
+drone setup networking --reset          # prompts before dropping connectivity
+drone setup networking --reset --yes    # no prompt (scripted / imaging)
+```
+
+It deletes the `uav-neo-ap` connection (which removes the SSID and the plaintext WPA2 PSK), deletes `netplan-eth0` and `99-uav-eth0.yaml` so eth0 returns to plain DHCP (no static IP, no MAC lock), removes the AP-isolation dispatcher, flushes the wlan0 FORWARD rules, and runs `netplan apply`. It is idempotent and touches only what `setup_networking.sh` added. On this build NetworkManager stores connections in netplan (`/etc/netplan/90-NM-<uuid>.yaml`), not in `system-connections/`, so this reset is what actually clears the AP PSK and static IP from an image; the per-unit `.nmconnection` wipe alone does not.
+
+Reapplying netplan tears down eth0. Run the reset from a local console or over the wlan0 AP if you are reaching the Pi over eth0, or expect the SSH/VS Code session to drop and reconnect via DHCP.
 
 ## Logs
 
