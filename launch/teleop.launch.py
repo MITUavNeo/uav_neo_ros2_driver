@@ -23,6 +23,7 @@ Adds topic relays so the student library can use simplified names:
     /imu             <- fused by student library (RealSense + MAVROS)
     /nav             <- /mavros/global_position/global
     /velocity        <- /mavros/local_position/velocity_body
+    /position        <- /mavros/local_position/pose
 """
 
 import os
@@ -224,6 +225,7 @@ def generate_launch_description():
         for src, dst in [
             ('/mavros/global_position/global',       '/nav'),
             ('/mavros/local_position/velocity_body', '/velocity'),
+            ('/mavros/local_position/pose',          '/position'),
         ]
     ]
 
