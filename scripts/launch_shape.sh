@@ -58,6 +58,10 @@ export ROS_HOME="$LOG_DIR"
 # shellcheck source=/opt/ros/jazzy/setup.bash
 source /opt/ros/jazzy/setup.bash
 
+# The kit's middleware is zenoh (uav-zenoh-router service, ~/.bashrc); match it so
+# this service's topics are visible to the rest of the drone.
+export RMW_IMPLEMENTATION="${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WS="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 if [ -f "$WS/install/setup.bash" ]; then

@@ -64,6 +64,7 @@ from geometry_msgs.msg import PoseStamped, TwistStamped
 from mavros_msgs.msg import State
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 
 
 # --- Defaults (overridable as ROS parameters) ---
@@ -76,7 +77,7 @@ DEFAULT_MAX_YAW_RATE = 0.5
 DEFAULT_WAYPOINT_TOLERANCE_M = 0.2
 DEFAULT_WAYPOINT_TIMEOUT_S = 12.0
 DEFAULT_SHAPE = 'square'
-DEFAULT_CONTROL_MODE = 'open_loop'
+DEFAULT_CONTROL_MODE = 'closed_loop'
 
 # Closed-loop reads the FCU local pose directly for arrival detection; no relay
 # needed. Override to /position if pointing at the teleop-relayed name.
@@ -268,8 +269,11 @@ class ShapeNode(Node):
             self._pub = self.create_publisher(
                 PoseStamped, '/mavros/setpoint_position/local', 10)
             position_topic = self.get_parameter('position_topic').value
+            # MAVROS publishes the local pose BEST_EFFORT; a RELIABLE sub gets no
+            # messages. Sensor QoS is BEST_EFFORT and also accepts a RELIABLE relay.
             self.create_subscription(
-                PoseStamped, position_topic, self._position_cb, 10)
+                PoseStamped, position_topic, self._position_cb,
+                qos_profile_sensor_data)
             self.create_timer(self._dt, self._tick_closed_loop)
         else:
             raise ValueError(

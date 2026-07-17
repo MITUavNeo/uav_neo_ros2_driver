@@ -17,7 +17,7 @@
 shape_node:
   ros__parameters:
     # open_loop or closed_loop
-    control_mode: open_loop
+    control_mode: closed_loop
 
     # square, triangle, circle (or a shape you added in shape_node.py)
     shape: square

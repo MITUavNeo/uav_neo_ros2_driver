@@ -957,7 +957,7 @@ Built-in shapes (`shape:=`): open-loop has segment shapes `square`, `triangle` p
 
 | Parameter | Default | Description |
 |---|---|---|
-| `control_mode` | `open_loop` | `open_loop` or `closed_loop` |
+| `control_mode` | `closed_loop` | `open_loop` or `closed_loop` |
 | `shape` | `square` | A built-in shape or one you add in `shape_node.py` |
 | `publish_rate` | `20.0` | Setpoint stream rate (Hz); PX4 needs >= 2 Hz for OFFBOARD |
 | `max_speed` | `0.5` | open_loop: m/s applied to the normalized velocity |
@@ -1001,8 +1001,10 @@ The setup adapts to the account it runs under, so it works on any drone in the k
 
 ```bash
 sudo systemctl disable --now uav-shape
-sudo systemctl enable  --now uav-teleop
+sudo systemctl enable  --now uav-teleop uav-watchdog
 ```
+
+Switching to shape mode disables `uav-teleop` and `uav-watchdog` (the watchdog `BindsTo` teleop and would otherwise pull it back in at boot; both are teleop-specific). The command above restores them.
 
 ### Node watchdog
 

@@ -3,9 +3,9 @@
 # which writes the rendered unit to /etc/systemd/system/uav-shape.service.
 [Unit]
 Description=UAV Neo Shape Flight (MAVROS + shape_node)
-After=network-online.target
-Wants=network-online.target
-Conflicts=uav-teleop.service
+After=network-online.target uav-zenoh-router.service
+Wants=network-online.target uav-zenoh-router.service
+Conflicts=uav-teleop.service uav-watchdog.service
 
 [Service]
 Type=exec

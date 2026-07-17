@@ -10,9 +10,11 @@
 #   ./scripts/setup_shape_service.sh --start    # also start now (FCU must be connected)
 #
 # Revert to teleop:
-#   sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop
+#   sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop uav-watchdog
 
-set -euo pipefail
+# No `-u`: ROS/colcon setup.bash reference unset vars under nounset and would abort
+# the sourcing below.
+set -eo pipefail
 
 # All paths are derived from where this script lives, so the current user, home,
 # and workspace name are picked up automatically.
@@ -77,10 +79,14 @@ sudo systemctl daemon-reload
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Enabling $SERVICE for boot ---"
-if systemctl list-unit-files 2>/dev/null | grep -q '^uav-teleop.service'; then
-    sudo systemctl disable --now uav-teleop.service 2>/dev/null || true
-    echo "uav-teleop: disabled and stopped"
-fi
+# uav-watchdog BindsTo uav-teleop, so leaving it enabled re-activates teleop at boot
+# (which conflicts with shape). Both are teleop-specific and unused in shape mode.
+for unit in uav-teleop.service uav-watchdog.service; do
+    if systemctl list-unit-files 2>/dev/null | grep -q "^$unit"; then
+        sudo systemctl disable --now "$unit" 2>/dev/null || true
+        echo "$unit: disabled and stopped"
+    fi
+done
 sudo systemctl enable "$SERVICE"
 echo "uav-shape: enabled (starts on next boot)"
 
@@ -101,4 +107,4 @@ echo "Check it:"
 echo "  systemctl status uav-shape"
 echo "  journalctl -u uav-shape -f"
 echo "Revert to teleop:"
-echo "  sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop"
+echo "  sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop uav-watchdog"

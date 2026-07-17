@@ -157,5 +157,5 @@ cd ~/ros2_ws/src/uav_neo_ros2_driver
 
 Only one of teleop / shape runs at a time, since both use the flight controller.
 Return to teleop with
-`sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop`.
+`sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop uav-watchdog`.
 See the README "Shape autostart" section for the manual equivalent.
