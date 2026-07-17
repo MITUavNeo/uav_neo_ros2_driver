@@ -29,7 +29,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     video_device_arg = DeclareLaunchArgument(
         'video_device',
-        default_value='/dev/video0',
+        default_value='/dev/arducam',
         description='V4L2 video device path for the Arducam')
 
     image_width_arg = DeclareLaunchArgument(

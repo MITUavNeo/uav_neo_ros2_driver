@@ -3,3 +3,6 @@
 SUBSYSTEM=="usb", ATTR{idVendor}=="8086", ATTR{idProduct}=="0b3a", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"
 # Arducam B0578
 SUBSYSTEM=="usb", ATTR{idVendor}=="0c45", ATTR{idProduct}=="0578", ATTR{power/autosuspend}="-1", ATTR{power/control}="on"
+
+# Stable /dev/arducam for the B0578 capture node, independent of USB enumeration order
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="0578", ENV{ID_V4L_CAPABILITIES}=="*:capture:*", SYMLINK+="arducam"
