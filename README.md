@@ -932,9 +932,48 @@ When enabled via `edgetpu_enable:=true`, the EdgeTPU node subscribes to `/camera
 
 The default model runs at ~26ms per frame (~38 FPS) on USB 3.0.
 
+### Shape node
+
+The shape node (`shape_node`) flies a repeating shape so an LED strip on the drone draws it in a long-exposure / timelapse photo. It streams setpoints **directly to MAVROS** - it does not use the mux or the gamepad. `shape.launch.py` is standalone: it brings up MAVROS and the shape node (no cameras, joy, mux, or gamepad), so it can replace the teleop service on boot (see [Shape autostart](#shape-autostart)).
+
+```bash
+ros2 launch uav_neo_ros2_driver shape.launch.py                       # brings up MAVROS + shape_node
+ros2 launch uav_neo_ros2_driver shape.launch.py mavros:=false         # shape_node only (MAVROS already up, e.g. sim)
+ros2 launch uav_neo_ros2_driver shape.launch.py shape:=spiral         # (edit config/shape.yaml for persistent settings)
+```
+
+Operating procedure: the safety pilot arms and switches to OFFBOARD on the RC transmitter; the node only advances the shape while armed and in OFFBOARD, so taking the drone out of and back into OFFBOARD pauses and resumes the shape rather than skipping ahead. Switching out of OFFBOARD is always the pilot's override.
+
+Two control modes let students compare open- and closed-loop control, each using its natural MAVROS topic:
+
+| Mode | Topic | Behavior | Best for |
+|---|---|---|---|
+| `open_loop` | `/mavros/setpoint_velocity/cmd_vel` | Body-frame velocity; dead-reckoned, drifts over time | Smooth continuous curves (circle, spiral, figure8, wave) |
+| `closed_loop` | `/mavros/setpoint_position/local` | Absolute position waypoints; PX4 flies to and holds each, so the shape stays anchored | Exact corners (square, triangle, circle) |
+
+Closed-loop mode depends on `config/mavros_px4.yaml` setting `setpoint_position: mav_frame: LOCAL_NED` (absolute waypoints). `setpoint_velocity` stays `BODY_NED` for the velocity path.
+
+Built-in shapes (`shape:=`): open-loop has segment shapes `square`, `triangle` plus velocity patterns `circle`, `spiral`, `figure8`, `wave`; closed-loop has waypoint shapes `square`, `triangle`, `circle`.
+
+| Parameter | Default | Description |
+|---|---|---|
+| `control_mode` | `open_loop` | `open_loop` or `closed_loop` |
+| `shape` | `square` | A built-in shape or one you add in `shape_node.py` |
+| `publish_rate` | `20.0` | Setpoint stream rate (Hz); PX4 needs >= 2 Hz for OFFBOARD |
+| `max_speed` | `0.5` | open_loop: m/s applied to the normalized velocity |
+| `max_yaw_rate` | `0.5` | open_loop: rad/s applied to the normalized yaw |
+| `require_offboard` | `true` | Advance only while armed + OFFBOARD; set false for bench testing without an FCU |
+| `waypoint_tolerance` | `0.2` | closed_loop: arrival distance (m) to advance to the next waypoint |
+| `waypoint_timeout` | `12.0` | closed_loop: advance anyway after this many seconds if a waypoint is never reached |
+| `position_topic` | `/mavros/local_position/pose` | closed_loop: pose topic for arrival detection |
+
+**Sizing:** default shapes are tuned to fit a ~6 x 3 m (20 x 10 ft) space (all footprints <= 1.5 m); the 3 m width is the binding dimension. Center the drone in the space before engaging OFFBOARD (closed-loop shapes are centered on the EKF origin; open-loop shapes grow from where OFFBOARD engages). Open-loop drifts, so favor closed-loop in tight spaces, and note `wave` travels forward and will cross the room rather than loop in place. Sizes scale with the constants at the top of `shape_node.py` (`SHAPE_RADIUS_M`, the `*_PERIOD_S`/`*_SIDE_SECONDS`) and with `max_speed`.
+
+Shapes are defined in `uav_neo_ros2_driver/shape_node.py` (`VELOCITY_SHAPES`, `VELOCITY_PATTERNS`, `WAYPOINT_SHAPES`); see [`docs/shape_node.md`](docs/shape_node.md) for how to add your own.
+
 ## Services
 
-Four systemd services are installed by `scripts/setup_services.sh` (or Phase 5 of `setup_all.sh`). All services start automatically on boot.
+Four systemd services are installed by `scripts/setup_services.sh` (or Phase 5 of `setup_all.sh`). All services start automatically on boot. A fifth, `uav-shape`, is an opt-in alternative to `uav-teleop` (see [Shape autostart](#shape-autostart)) and is not installed by the setup script.
 
 ### Teleop autostart
 
@@ -945,6 +984,22 @@ sudo systemctl start uav-teleop    # start now
 sudo systemctl stop uav-teleop     # stop
 sudo systemctl restart uav-teleop  # restart (creates new log session)
 ```
+
+### Shape autostart
+
+The `uav-shape` service is an **alternative** to `uav-teleop` for LED-shape flights: it launches `shape.launch.py` (MAVROS + shape_node only) on boot via `scripts/launch_shape.sh`, which reuses teleop's log-directory and shared-memory-cleanup logic. It is **not** installed or enabled by `setup_services.sh` - it is an opt-in swap. Only one of `uav-teleop` / `uav-shape` can run at a time (both bind the FCU via MAVROS); the unit declares `Conflicts=uav-teleop.service` so systemd will not run both.
+
+After pulling the latest branch, one script does the whole swap (build, install the unit, disable teleop, enable shape for boot). It renders the service unit for whatever user runs it - no hardcoded user, home, or workspace path (all derived from the script's location):
+
+```bash
+cd <your-workspace>/src/uav_neo_ros2_driver
+./scripts/setup_shape_service.sh          # build + install + enable for boot
+./scripts/setup_shape_service.sh --start  # ...and start now (FCU must be connected)
+```
+
+Pick the shape/mode in `config/shape.yaml`, then `sudo systemctl restart uav-shape`. Revert to teleop any time with `sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop`.
+
+The unit is generated from `scripts/uav-shape.service.in` (a template with `__USER__` / `__HOME__` / `__WS__` / `__REPO_DIR__` placeholders); the script fills those in for the current user and writes `/etc/systemd/system/uav-shape.service`.
 
 ### Node watchdog
 

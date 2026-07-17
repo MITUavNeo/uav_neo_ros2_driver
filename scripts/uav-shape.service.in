@@ -1,0 +1,23 @@
+# Template for uav-shape.service. Not a usable unit as-is: the __PLACEHOLDER__
+# fields are filled in for the current user by scripts/setup_shape_service.sh,
+# which writes the rendered unit to /etc/systemd/system/uav-shape.service.
+[Unit]
+Description=UAV Neo Shape Flight (MAVROS + shape_node)
+After=network-online.target
+Wants=network-online.target
+Conflicts=uav-teleop.service
+
+[Service]
+Type=exec
+User=__USER__
+Group=__GROUP__
+ExecStart=__REPO_DIR__/scripts/launch_shape.sh
+Restart=on-failure
+RestartSec=10
+Environment=HOME=__HOME__
+WorkingDirectory=__WS__
+KillMode=control-group
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

@@ -79,7 +79,10 @@
     tf.frame_id: "map"
     tf.child_frame_id: "target_position"
     tf.rate_limit: 50.0
-    mav_frame: BODY_NED
+    # LOCAL_NED so position setpoints are absolute (anchored to the local
+    # origin), not offsets from the current pose. shape_node closed_loop mode
+    # relies on this; BODY_NED would make each waypoint drift with the drone.
+    mav_frame: LOCAL_NED
 
 /**/setpoint_velocity:
   ros__parameters:

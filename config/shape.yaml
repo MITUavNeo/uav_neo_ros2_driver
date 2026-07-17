@@ -1,0 +1,44 @@
+# Shape-flying node configuration for UAV Neo
+#
+# The shape node streams setpoints directly to MAVROS (no mux, no gamepad) so
+# the drone repeatedly traces a shape for an LED long-exposure / timelapse
+# photo. It only advances the shape while armed and in OFFBOARD, so taking the
+# drone in and out of OFFBOARD resumes the shape where it paused.
+#
+# Two control modes (select with control_mode):
+#   open_loop   - body-frame velocity to /mavros/setpoint_velocity/cmd_vel;
+#                 dead-reckoned, drifts over time.
+#   closed_loop - absolute position waypoints to /mavros/setpoint_position/local;
+#                 PX4 holds each point, so the shape stays anchored.
+#
+# Shapes live in shape_node.py (VELOCITY_SHAPES / WAYPOINT_SHAPES); add your own
+# there and select it by name below.
+
+shape_node:
+  ros__parameters:
+    # open_loop or closed_loop
+    control_mode: open_loop
+
+    # square, triangle, circle (or a shape you added in shape_node.py)
+    shape: square
+
+    # Setpoint stream rate (Hz). PX4 needs >= 2 Hz to stay in OFFBOARD.
+    publish_rate: 20.0
+
+    # open_loop only: scales the normalized [-1, 1] segments to m/s and rad/s.
+    # Match config/mux.yaml so the shape flies at the same limits as teleop.
+    max_speed: 0.5
+    max_yaw_rate: 0.5
+
+    # Advance the shape only while armed and in OFFBOARD. Set false only for
+    # bench testing without an FCU (the shape then runs unconditionally).
+    require_offboard: true
+
+    # closed_loop only: advance to the next waypoint once within this distance
+    # (m), or after waypoint_timeout (s) if it is never reached.
+    waypoint_tolerance: 0.2
+    waypoint_timeout: 12.0
+
+    # closed_loop only: pose topic for arrival detection. Reads the FCU pose
+    # directly; set to /position if using the teleop-relayed name instead.
+    position_topic: /mavros/local_position/pose
