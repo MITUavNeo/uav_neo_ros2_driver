@@ -69,7 +69,7 @@ The default sizes are tuned to fit a ~6 x 3 m (20 x 10 ft) room, all footprints
 <= 1.5 m; the 3 m width is the binding dimension.
 
 - Center the drone in the space before engaging OFFBOARD. Closed-loop shapes are
-  centered on the EKF origin (roughly where it booted); open-loop shapes grow from
+  centered on the local origin (roughly where it booted); open-loop shapes grow from
   wherever the drone is when OFFBOARD engages.
 - Open-loop drifts (no position feedback), so its real footprint wanders. In a tight
   space favor `closed_loop`, which is anchored and does not drift.
@@ -146,16 +146,16 @@ source install/setup.bash
 
 ## Autostart on boot (swap for teleop)
 
-After pulling the latest branch, one script builds the package, installs
-`uav-shape.service`, disables teleop, and enables the shape service for boot:
+One command sets the drone to fly the shape on boot instead of the normal teleop
+stack:
 
 ```bash
 cd ~/ros2_ws/src/uav_neo_ros2_driver
-./scripts/setup_shape_service.sh          # enable for boot
-./scripts/setup_shape_service.sh --start  # ...and start now (FCU connected)
+./scripts/setup_shape_service.sh          # enable shape mode on boot
+./scripts/setup_shape_service.sh --start  # ...and start it now (flight controller connected)
 ```
 
-Only one of `uav-teleop` / `uav-shape` can run at a time (both bind the FCU via
-MAVROS). Revert with
+Only one of teleop / shape runs at a time, since both use the flight controller.
+Return to teleop with
 `sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop`.
 See the README "Shape autostart" section for the manual equivalent.

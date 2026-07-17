@@ -962,14 +962,14 @@ Built-in shapes (`shape:=`): open-loop has segment shapes `square`, `triangle` p
 | `publish_rate` | `20.0` | Setpoint stream rate (Hz); PX4 needs >= 2 Hz for OFFBOARD |
 | `max_speed` | `0.5` | open_loop: m/s applied to the normalized velocity |
 | `max_yaw_rate` | `0.5` | open_loop: rad/s applied to the normalized yaw |
-| `require_offboard` | `true` | Advance only while armed + OFFBOARD; set false for bench testing without an FCU |
+| `require_offboard` | `true` | Advance only while armed + OFFBOARD; set false to test without a flight controller |
 | `waypoint_tolerance` | `0.2` | closed_loop: arrival distance (m) to advance to the next waypoint |
 | `waypoint_timeout` | `12.0` | closed_loop: advance anyway after this many seconds if a waypoint is never reached |
 | `position_topic` | `/mavros/local_position/pose` | closed_loop: pose topic for arrival detection |
 
-**Sizing:** default shapes are tuned to fit a ~6 x 3 m (20 x 10 ft) space (all footprints <= 1.5 m); the 3 m width is the binding dimension. Center the drone in the space before engaging OFFBOARD (closed-loop shapes are centered on the EKF origin; open-loop shapes grow from where OFFBOARD engages). Open-loop drifts, so favor closed-loop in tight spaces, and note `wave` travels forward and will cross the room rather than loop in place. Sizes scale with the constants at the top of `shape_node.py` (`SHAPE_RADIUS_M`, the `*_PERIOD_S`/`*_SIDE_SECONDS`) and with `max_speed`.
+**Sizing:** default shapes are tuned to fit a ~6 x 3 m (20 x 10 ft) space (all footprints <= 1.5 m); the 3 m width is the binding dimension. Center the drone in the space before engaging OFFBOARD (closed-loop shapes are centered on the local origin; open-loop shapes grow from where OFFBOARD engages). Open-loop drifts, so favor closed-loop in tight spaces, and note `wave` travels forward and will cross the room rather than loop in place. Sizes scale with `max_speed` and are adjustable per shape.
 
-Shapes are defined in `uav_neo_ros2_driver/shape_node.py` (`VELOCITY_SHAPES`, `VELOCITY_PATTERNS`, `WAYPOINT_SHAPES`); see [`docs/shape_node.md`](docs/shape_node.md) for how to add your own.
+See [`docs/shape_node.md`](docs/shape_node.md) to resize shapes or add your own.
 
 ## Services
 
@@ -987,19 +987,22 @@ sudo systemctl restart uav-teleop  # restart (creates new log session)
 
 ### Shape autostart
 
-The `uav-shape` service is an **alternative** to `uav-teleop` for LED-shape flights: it launches `shape.launch.py` (MAVROS + shape_node only) on boot via `scripts/launch_shape.sh`, which reuses teleop's log-directory and shared-memory-cleanup logic. It is **not** installed or enabled by `setup_services.sh` - it is an opt-in swap. Only one of `uav-teleop` / `uav-shape` can run at a time (both bind the FCU via MAVROS); the unit declares `Conflicts=uav-teleop.service` so systemd will not run both.
+The `uav-shape` service is an alternative to `uav-teleop` that flies the LED shape (MAVROS + shape node, no cameras or manual teleop) on boot. Only one of the two runs at a time, since both use the flight controller, so the shape service is off by default.
 
-After pulling the latest branch, one script does the whole swap (build, install the unit, disable teleop, enable shape for boot). It renders the service unit for whatever user runs it - no hardcoded user, home, or workspace path (all derived from the script's location):
+Switch the drone into shape mode on boot with one command:
 
 ```bash
-cd <your-workspace>/src/uav_neo_ros2_driver
-./scripts/setup_shape_service.sh          # build + install + enable for boot
-./scripts/setup_shape_service.sh --start  # ...and start now (FCU must be connected)
+cd ~/ros2_ws/src/uav_neo_ros2_driver
+./scripts/setup_shape_service.sh          # enable shape mode on boot
+./scripts/setup_shape_service.sh --start  # ...and start it now (flight controller connected)
 ```
 
-Pick the shape/mode in `config/shape.yaml`, then `sudo systemctl restart uav-shape`. Revert to teleop any time with `sudo systemctl disable --now uav-shape && sudo systemctl enable --now uav-teleop`.
+The setup adapts to the account it runs under, so it works on any drone in the kit. Choose the shape and mode in `config/shape.yaml`, then apply with `sudo systemctl restart uav-shape`. Return to the normal teleop stack at any time:
 
-The unit is generated from `scripts/uav-shape.service.in` (a template with `__USER__` / `__HOME__` / `__WS__` / `__REPO_DIR__` placeholders); the script fills those in for the current user and writes `/etc/systemd/system/uav-shape.service`.
+```bash
+sudo systemctl disable --now uav-shape
+sudo systemctl enable  --now uav-teleop
+```
 
 ### Node watchdog
 
