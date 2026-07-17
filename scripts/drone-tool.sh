@@ -278,7 +278,14 @@ __DR_SVC_HELP__
                 arducam)     bash "$sdir/setup_arducam.sh" "$@" ;;
                 coral)       bash "$sdir/setup_coral.sh" "$@" ;;
                 services)    bash "$sdir/setup_services.sh" "$@" ;;
-                networking)  bash "$sdir/setup_networking.sh" "$@" ;;
+                networking)
+                    if [ "${1:-}" = "--reset" ]; then
+                        shift
+                        bash "$sdir/reset_networking.sh" "$@"
+                    else
+                        bash "$sdir/setup_networking.sh" "$@"
+                    fi
+                    ;;
                 controller)  bash "$sdir/setup_controller.sh" "$@" ;;
                 *)
                     echo "drone setup: unknown phase '$phase'" >&2
@@ -608,6 +615,7 @@ Commands:
                           coral        - Coral EdgeTPU
                           services     - systemd units + JupyterLab
                           networking   - eth0 dual-IP + wlan0 isolated AP
+                                         (--reset reverts to stock, pre-imaging)
                           controller   - hid_nintendo blacklist (XInput fallback)
     service <action>    systemd service control. Actions:
                           install              setup_services.sh (drop + enable units)
@@ -665,8 +673,13 @@ _drone_complete() {
             fi
             ;;
         setup)
-            # shellcheck disable=SC2207
-            COMPREPLY=( $(compgen -W "all pixhawk realsense arducam coral services networking controller" -- "$cur") )
+            if [[ "$prev" == "networking" ]]; then
+                # shellcheck disable=SC2207
+                COMPREPLY=( $(compgen -W "--reset" -- "$cur") )
+            else
+                # shellcheck disable=SC2207
+                COMPREPLY=( $(compgen -W "all pixhawk realsense arducam coral services networking controller" -- "$cur") )
+            fi
             ;;
         service)
             if [[ $COMP_CWORD -eq 2 ]]; then
