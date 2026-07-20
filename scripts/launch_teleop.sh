@@ -70,4 +70,8 @@ exec &> >(tee -a "$LOG_DIR/teleop.log")
 # ---------------------------------------------------------------------------
 # Launch - exec replaces this shell so systemd tracks the ros2 PID directly
 # ---------------------------------------------------------------------------
-exec ros2 launch uav_neo_ros2_driver teleop.launch.py edgetpu_enable:=true "$@"
+# manual:=false brings up the autonomy stack (MAVROS + relays + cameras, no mux
+# or gamepad) that the flight scripts need. Pass manual:=true here to restore
+# manual gamepad teleop. "$@" lets a caller override any argument.
+exec ros2 launch uav_neo_ros2_driver teleop.launch.py \
+    edgetpu_enable:=true manual:=false "$@"

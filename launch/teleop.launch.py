@@ -32,7 +32,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, ExecuteProcess, \
     IncludeLaunchDescription, TimerAction
-from launch.conditions import LaunchConfigurationEquals
+from launch.conditions import IfCondition, LaunchConfigurationEquals
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -164,6 +164,21 @@ def generate_launch_description():
         default_value='/dev/input/js0',
         description='Joystick device path')
 
+    # The gamepad+mux path publishes manual velocity to
+    # /mavros/setpoint_velocity/cmd_vel. Autonomous flights publish to the same
+    # topic directly from the library, so run with manual:=false to keep the mux
+    # from competing with autonomy setpoints. joy_node stays up either way for the
+    # START/BACK buttons.
+    manual_arg = DeclareLaunchArgument(
+        'manual',
+        default_value='true',
+        description='Bring up the manual-teleop gamepad and mux. Set false for '
+                    'autonomous flights so the mux does not publish competing '
+                    'velocity setpoints (joy stays up for START/BACK).')
+
+    # joy_node runs in both modes: the library reads /joy for the START/BACK
+    # buttons that run and stop a program. Only the gamepad and mux (which publish
+    # competing velocity setpoints) are gated by manual.
     joy_node = Node(
         package='joy',
         executable='joy_node',
@@ -184,6 +199,7 @@ def generate_launch_description():
         name='gamepad_node',
         output='log',
         parameters=[os.path.join(pkg_dir, 'config', 'gamepad.yaml')],
+        condition=IfCondition(LaunchConfiguration('manual')),
     )
 
     # Mux: launched via standalone mux.launch.py so the watchdog can
@@ -191,6 +207,7 @@ def generate_launch_description():
     mux_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(launch_dir, 'mux.launch.py')),
+        condition=IfCondition(LaunchConfiguration('manual')),
     )
 
     # RealSense is mounted upside down, so its color and depth relays rotate the
@@ -242,6 +259,7 @@ def generate_launch_description():
         edgetpu_enable_arg,
         edgetpu_config_arg,
         joy_device_arg,
+        manual_arg,
         realsense_flip_arg,
         mavros_launch,
         joy_node,

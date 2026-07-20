@@ -16,10 +16,18 @@
 
 """Fly a repeating shape for an LED long-exposure / timelapse photo.
 
-The node streams setpoints directly to MAVROS (no mux, no gamepad). It keeps
-running while the drone is taken in and out of OFFBOARD: it only advances the
-shape while armed and in OFFBOARD, so when the safety pilot hands control back
-the shape resumes where it paused instead of jumping ahead.
+Example of driving the flight controller directly with ROS 2: this node talks to
+MAVROS itself (no mux, no gamepad, no drone_core library) so you can see how
+setpoints, subscriptions, QoS, and the OFFBOARD state machine work at the ROS
+level. For flying a shape the same way in the simulator and on the real drone,
+use the portable shape flight instead
+(uav-neo-summer-course-labs/labs/flights/shape_flight/), which draws these same
+shapes through the drone_core library.
+
+The node streams setpoints directly to MAVROS. It keeps running while the drone is
+taken in and out of OFFBOARD: it only advances the shape while armed and in
+OFFBOARD, so when the safety pilot hands control back the shape resumes where it
+paused instead of jumping ahead.
 
 Two control modes are provided so students can compare them:
 

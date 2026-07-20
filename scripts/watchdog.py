@@ -52,7 +52,6 @@ PACKAGE = 'uav_neo_ros2_driver'
 MAVROS_EXECUTABLE_PATH = '/lib/mavros/mavros_node'
 REALSENSE_EXECUTABLE_PATH = '/realsense2_camera/realsense2_camera_node'
 GSCAM_EXECUTABLE_PATH = '/install/gscam/lib/gscam/gscam_node'
-MUX_EXECUTABLE_PATH = '/lib/uav_neo_ros2_driver/mux_node'
 
 
 def _is_running(path_substring: str):
@@ -108,15 +107,8 @@ NODES = {
         'kill_pattern': 'gscam_node',
         'process_check': _is_running(GSCAM_EXECUTABLE_PATH),
     },
-    'mux': {
-        'topic': '/mavros/setpoint_velocity/cmd_vel',
-        # standalone; using teleop.launch.py would re-spawn the whole stack
-        'launch': 'mux.launch.py',
-        'device_check': lambda: True,  # software node, always "connected"
-        'device_label': 'mux_node (software)',
-        'kill_pattern': 'mux_node',
-        'process_check': _is_running(MUX_EXECUTABLE_PATH),
-    },
+    # mux_node is intentionally not watched: autonomy flights publish setpoints
+    # to MAVROS directly, so a resurrected mux would compete with them.
 }
 
 # ---------------------------------------------------------------------------
